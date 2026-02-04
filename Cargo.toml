@@ -1,0 +1,12 @@
+[package]
+name = "necko3"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+tokio = { version = "1.49", features = ["full"] }
+
+alloy = { version = "1.6", features = ["full"] }
+coins-bip32 = "0.13"
+anyhow = "1"
+#k256 = "0.14.0-rc.7"
