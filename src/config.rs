@@ -1,3 +1,4 @@
+use crate::chain::ChainType;
 use alloy::primitives::Address;
 use tokio::sync::RwLock;
 
@@ -6,11 +7,6 @@ pub struct TokenConfig {
     pub symbol: String,
     pub contract: Address,
     pub decimals: u8,
-}
-
-#[derive(Debug, Copy, Clone)]
-pub enum ChainType {
-    EVM
 }
 
 #[derive(Debug)]

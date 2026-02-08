@@ -2,14 +2,15 @@ use crate::config::ChainConfig;
 use crate::model::PaymentEvent;
 use alloy::consensus::Transaction;
 use alloy::network::TransactionResponse;
-use alloy::primitives::{Address, BlockNumber, U256};
+use alloy::primitives::utils::format_units;
+use alloy::primitives::{Address, BlockNumber};
 use alloy::providers::{Provider, ProviderBuilder};
 use alloy::rpc::types::Transaction as RpcTransaction;
 use alloy::rpc::types::{Block, Filter};
 use alloy::sol;
-use bigdecimal::{BigDecimal, FromPrimitive};
 use std::sync::Arc;
 use std::time::Duration;
+use coins_bip32::prelude::{Parent, XPub};
 use tokio::sync::mpsc;
 use url::Url;
 
@@ -20,12 +21,11 @@ sol! {
     event Transfer(address indexed from, address indexed to, uint256 value);
 }
 
-fn format_units(amount: U256, decimals: u8) -> BigDecimal {
-    let amount_str = amount.to_string();
-    let amount_big: BigDecimal = amount_str.parse().unwrap_or_default();
+pub fn get_address(xpub: XPub, index: u32) -> anyhow::Result<Address> {
+    let child_xpub = xpub.derive_child(index)?;
+    let verifying_key = child_xpub.as_ref();
 
-    let scale = BigDecimal::from_u64(10u64.pow(decimals as u32)).unwrap();
-    amount_big / scale
+    Ok(Address::from_public_key(&verifying_key))
 }
 
 pub async fn listen_on(
@@ -79,7 +79,7 @@ pub async fn listen_on(
                 let transactions = process_block(&addresses, block)
                     .unwrap_or_default();
                 for tx in transactions {
-                    let amount_human = format_units(tx.value(), config.decimals);
+                    let amount_human = format_units(tx.value(), config.decimals)?;
 
                     let event = PaymentEvent {
                         network: config.name.clone(),
@@ -90,6 +90,7 @@ pub async fn listen_on(
                         token: config.native_symbol.clone(),
                         amount: amount_human,
                         amount_raw: tx.value(),
+                        decimals: config.decimals,
                     };
 
                     let _ = sender.send(event).await;
@@ -169,7 +170,8 @@ async fn process_logs(
                     return;
                 };
 
-                let amount_human = format_units(event_data.value, token_conf.decimals);
+                let amount_human = format_units(event_data.value, token_conf.decimals)
+                    .unwrap_or_default();
 
                 let event = PaymentEvent {
                     network: config.name.clone(),
@@ -178,7 +180,8 @@ async fn process_logs(
                     to: event_data.to,
                     token: token_conf.symbol.clone(),
                     amount: amount_human,
-                    amount_raw: event_data.value
+                    amount_raw: event_data.value,
+                    decimals: token_conf.decimals,
                 };
 
                 let _ = sender.send(event).await;
