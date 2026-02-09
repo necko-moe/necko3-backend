@@ -1,11 +1,13 @@
 use crate::chain;
-use crate::config::{ChainConfig, TokenConfig};
+use crate::config::{ChainConfig, MinChainConfig, TokenConfig};
 use crate::model::{Invoice, InvoiceStatus, PaymentEvent};
 use alloy::primitives::utils::format_units;
 use alloy::primitives::Address;
 use dashmap::DashMap;
 use std::collections::HashMap;
+use std::ops::Deref;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{mpsc, Mutex, RwLock};
 use tokio::task::JoinHandle;
@@ -22,24 +24,16 @@ pub struct AppState {
 }
 
 impl AppState {
-    pub fn with_chains(chains: Vec<ChainConfig>) -> Self {
-        let mut chains_map = HashMap::new();
-        chains.into_iter().for_each(|chain| {
-            chains_map.insert(chain.name.clone(), Arc::new(chain)); });
-
+    pub fn new() -> Self {
         let (tx, rx): (Sender<PaymentEvent>, Receiver<PaymentEvent>) = mpsc::channel(100);
 
         Self {
             tx,
             rx: Mutex::new(rx),
-            chains: RwLock::new(chains_map),
+            chains: RwLock::new(HashMap::new()),
             active_chains: RwLock::new(HashMap::new()),
             active_invoices: DashMap::new(),
         }
-    }
-
-    pub fn new() -> Self {
-        Self::with_chains(vec![])
     }
 
     pub fn get_free_slot(&self) -> Option<u32> {
@@ -55,8 +49,10 @@ impl AppState {
 
         None // actually unreachable, but who knows
     }
+}
 
-    pub fn start_invoice_watcher(self: Arc<Self>) -> () {
+impl AppState {
+    pub fn start_invoice_watcher(self: Arc<Self>) -> JoinHandle<()> {
         tokio::spawn(async move {
             let state_clone = self.clone();
             let mut rx = state_clone.rx.lock().await;
@@ -69,10 +65,23 @@ impl AppState {
                         continue;
                     };
 
+                    if event.network != invoice.network {
+                        println!("bro just sent tokens in network {}, not in {} 💀💀💀",
+                                 event.network, invoice.network);
+                        continue;
+                    }
+
                     if event.token != invoice.token {
                         println!("bro just sent tokens in {}, not in {} 💀💀💀",
                                  event.token, invoice.token);
                         continue;
+                    }
+
+                    let now = chrono::Utc::now();
+                    if invoice.expires_at < now {
+                        println!("detected transaction on EXPIRED invoice. skipping \
+                        (you lost your tokens idiot)");
+                        continue
                     }
 
                     let amount_human = format_units(invoice.paid, event.decimals)
@@ -109,31 +118,184 @@ impl AppState {
 
                     if let Some(chain_config) = maybe_chain_config {
                         let mut addresses = chain_config
-                            .watch_addresses.write().await;
-                        addresses.retain(|a| *a != invoice_address);
+                            .watch_addresses.write().unwrap();
+                        addresses.remove(&invoice_address);
                     } else {
                         eprintln!("FATAL: failed to get chain config for {}", event.network);
                     }
                 }
             }
-        });
+        })
+    }
+
+    pub fn start_janitor(self: Arc<Self>, interval: Duration) -> JoinHandle<()> {
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(interval);
+
+            loop {
+                interval.tick().await;
+                println!("checking for expired invoices...");
+
+                let now = chrono::Utc::now();
+                let mut expired_addresses = Vec::new();
+
+                for entry in self.active_invoices.iter() {
+                    let invoice = entry.value();
+                    if invoice.status == InvoiceStatus::Pending && invoice.expires_at < now {
+                        expired_addresses.push(
+                            (invoice.address, invoice.network.clone(), invoice.id.clone()));
+                    }
+                }
+
+                for (address, network, invoice_id) in expired_addresses {
+                    println!("marking invoice {} (address {}) as expired", invoice_id, address);
+
+                    if let Some(mut inv) = self.active_invoices
+                        .get_mut(&address) {
+                        inv.status = InvoiceStatus::Expired;
+                    }
+
+                    if let Some(chain) = self.chains.read().await.get(&network) {
+                        chain.watch_addresses.write().unwrap().remove(&address);
+                    }
+                }
+            }
+        })
     }
 }
 
 impl AppState {
     pub async fn add_chain(
-        &mut self,
+        &self,
         chain: ChainConfig
     ) -> anyhow::Result<()> {
-        todo!()
+        let name = chain.name.clone();
+
+        if self.chains.read().await.contains_key(&name) {
+            anyhow::bail!("chain '{}' already exists", name);
+        }
+
+        self.chains.write().await.insert(name.clone(), Arc::new(chain));
+
+        self.start_listening(name).await?;
+
+        Ok(())
+    }
+
+    pub async fn get_chains(&self) -> Vec<MinChainConfig> {
+        let chains = self.chains.read().await;
+
+        chains.iter()
+            .map(|x| {
+                x.1.deref().into()
+            })
+            .collect()
+    }
+
+    pub async fn get_chain(
+        &self,
+        name: &str
+    ) -> MinChainConfig {
+        let chains = self.chains.read().await;
+
+        chains.iter()
+            .find(|x| x.1.name == name)
+            .map(|x| {
+                x.1.deref()
+            })
+            .unwrap()
+            .into()
+    }
+
+    pub async fn remove_chain(
+        &self,
+        name: &str
+    ) -> anyhow::Result<()> {
+        self.stop_listening(name.to_string()).await?;
+
+        self.chains.write().await.remove(name);
+
+        Ok(())
     }
 
     pub async fn add_token(
-        &mut self,
+        &self,
         chain_name: String,
         token: TokenConfig
     ) -> anyhow::Result<()> {
-        todo!()
+        let guard = self.chains.read().await;
+
+        let maybe_config = guard.get(&chain_name);
+
+        let Some(chain_config) = maybe_config else {
+            anyhow::bail!("chain '{}' does not exist", chain_name);
+        };
+
+        chain_config.tokens.write().unwrap().insert(token);
+
+        Ok(())
+    }
+
+    pub async fn remove_token(
+        &self,
+        chain_name: String,
+        symbol: String,
+    ) -> anyhow::Result<()> {
+        let guard = self.chains.read().await;
+
+        let maybe_config = guard.get(&chain_name);
+
+        let Some(chain_config) = maybe_config else {
+            anyhow::bail!("chain '{}' does not exist", chain_name);
+        };
+
+        // maybe_TokenConfig
+        let mb_tc = chain_config.tokens.read().unwrap().iter()
+            .find(|x| x.symbol == symbol)
+            .cloned();
+
+        let Some(token_config) = mb_tc else {
+            anyhow::bail!("token with symbol '{}' does not exist", symbol);
+        };
+
+        chain_config.tokens.write().unwrap().remove(&token_config);
+
+        Ok(())
+    }
+
+    pub async fn get_tokens(
+        &self,
+        chain_name: String
+    ) -> anyhow::Result<Vec<TokenConfig>> {
+        let guard = self.chains.read().await;
+
+        let Some(chain) = guard.get(&chain_name) else {
+            anyhow::bail!("chain '{}' does not exist", chain_name);
+        };
+
+        Ok(chain.tokens.read().unwrap().iter().cloned().collect())
+    }
+
+    pub async fn get_token(
+        &self,
+        chain_name: String,
+        symbol: String,
+    ) -> anyhow::Result<TokenConfig> {
+        let guard = self.chains.read().await;
+
+        let Some(chain) = guard.get(&chain_name) else {
+            anyhow::bail!("chain '{}' does not exist", chain_name);
+        };
+
+        let mb_tc = chain.tokens.read().unwrap().iter()
+            .find(|x| x.symbol == symbol)
+            .cloned();
+
+        let Some(token_config) = mb_tc else {
+            anyhow::bail!("token with symbol '{}' does not exist", symbol);
+        };
+
+        Ok(token_config)
     }
 
     pub async fn start_listening(&self, chain: String) -> anyhow::Result<()> {

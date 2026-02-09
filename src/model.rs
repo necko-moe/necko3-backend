@@ -30,8 +30,9 @@ pub struct Invoice {
     pub amount_raw: U256,
     pub paid: U256,
     pub token: String,
+    pub network: String,
     pub created_at: DateTime<Utc>,
-    pub expires_at: DateTime<Utc>, // todo check expirations
+    pub expires_at: DateTime<Utc>,
     pub status: InvoiceStatus,
 }
 
@@ -41,3 +42,4 @@ pub struct CreateInvoiceReq {
     pub token: String,
     pub network: String,
 }
+

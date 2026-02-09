@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use crate::config::ChainConfig;
 use crate::model::PaymentEvent;
 use alloy::consensus::Transaction;
@@ -8,9 +9,9 @@ use alloy::providers::{Provider, ProviderBuilder};
 use alloy::rpc::types::Transaction as RpcTransaction;
 use alloy::rpc::types::{Block, Filter};
 use alloy::sol;
+use coins_bip32::prelude::{Parent, XPub};
 use std::sync::Arc;
 use std::time::Duration;
-use coins_bip32::prelude::{Parent, XPub};
 use tokio::sync::mpsc;
 use url::Url;
 
@@ -72,7 +73,7 @@ pub async fn listen_on(
                 .flatten()
             {
                 let addresses = {
-                    let guard = config.watch_addresses.read().await;
+                    let guard = config.watch_addresses.read().unwrap();
                     guard.clone()
                 };
 
@@ -107,7 +108,7 @@ pub async fn listen_on(
 }
 
 fn process_block(
-    addresses: &[Address],
+    addresses: &HashSet<Address>,
     block: Block,
 ) -> anyhow::Result<Vec<RpcTransaction>> {
     let txs = block.into_transactions_vec();
@@ -129,7 +130,7 @@ async fn process_logs(
     provider: &impl Provider,
     sender: mpsc::Sender<PaymentEvent>,
 ) {
-    let token_addresses: Vec<Address> = config.tokens.iter()
+    let token_addresses: Vec<Address> = config.tokens.read().unwrap().iter()
         .map(|t| t.contract)
         .collect();
 
@@ -155,19 +156,26 @@ async fn process_logs(
             let event_data = transfer.inner;
 
             let addresses = {
-                let guard = config.watch_addresses.read().await;
+                let guard = config.watch_addresses.read().unwrap();
                 guard.clone()
             };
 
             if addresses.contains(&event_data.to) {
-                let maybe_conf = config.tokens.iter()
-                    .find(|t| t.contract == event_data.address);
-                //    .unwrap(); // trust me bro :)
+                let token_conf = {
+                    let guard = config.tokens.read().unwrap();
+                    let maybe_conf = guard.iter()
+                        .find(|t| t.contract == event_data.address);
+                        // .unwrap(); // trust me bro :)
 
-                let Some(token_conf) = maybe_conf else {
-                    eprintln!("(should be unreachable) received log from UNKNOWN contract: {}", event_data.address);
-                    // NEVER trust anyone
-                    return;
+                    match maybe_conf.cloned() {
+                        Some(tc) => tc,
+                        None => {
+                            eprintln!("(should be unreachable) received log from UNKNOWN contract \
+                            for {}", event_data.address);
+                            // NEVER trust anyone
+                            return;
+                        }
+                    }
                 };
 
                 let amount_human = format_units(event_data.value, token_conf.decimals)

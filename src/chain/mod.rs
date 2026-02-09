@@ -4,11 +4,12 @@ use crate::model::PaymentEvent;
 use std::sync::Arc;
 use alloy::primitives::Address;
 use coins_bip32::prelude::XPub;
+use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 
 pub mod evm;
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub enum ChainType {
     EVM
 }
