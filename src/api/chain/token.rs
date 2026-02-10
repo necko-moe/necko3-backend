@@ -27,8 +27,7 @@ pub async fn get_tokens(
 
 pub async fn get_token(
     State(state): State<Arc<AppState>>,
-    Path(name): Path<String>,
-    Path(symbol): Path<String>,
+    Path((name, symbol)): Path<(String, String)>,
 ) -> Result<Json<TokenConfig>, String> {
     match state.get_token(name, symbol).await {
         Ok(conf) => Ok(Json(conf)),
@@ -38,8 +37,7 @@ pub async fn get_token(
 
 pub async fn remove_token(
     State(state): State<Arc<AppState>>,
-    Path(name): Path<String>,
-    Path(symbol): Path<String>,
+    Path((name, symbol)): Path<(String, String)>,
 ) -> String {
     match state.remove_token(name, symbol).await {
         Ok(_) => "ok".to_owned(),

@@ -1,4 +1,4 @@
-use alloy::primitives::{Address, TxHash, U256};
+use alloy::primitives::{TxHash, U256};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
@@ -6,8 +6,8 @@ use serde::{Deserialize, Serialize};
 pub struct PaymentEvent {
     pub network: String,
     pub tx_hash: TxHash,
-    pub from: Address,
-    pub to: Address,
+    pub from: String,
+    pub to: String,
     pub token: String,
     pub amount: String,
     pub amount_raw: U256,
@@ -25,10 +25,11 @@ pub enum InvoiceStatus {
 pub struct Invoice {
     pub id: String,
     pub address_index: u32,
-    pub address: Address,
+    pub address: String,
     pub amount: String,
     pub amount_raw: U256,
-    pub paid: U256,
+    pub paid: String,
+    pub paid_raw: U256,
     pub token: String,
     pub network: String,
     pub created_at: DateTime<Utc>,

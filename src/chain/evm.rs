@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use crate::chain::BlockchainAdapter;
 use crate::config::ChainConfig;
 use crate::model::PaymentEvent;
 use alloy::consensus::Transaction;
@@ -10,6 +10,8 @@ use alloy::rpc::types::Transaction as RpcTransaction;
 use alloy::rpc::types::{Block, Filter};
 use alloy::sol;
 use coins_bip32::prelude::{Parent, XPub};
+use std::collections::HashSet;
+use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc;
@@ -22,93 +24,113 @@ sol! {
     event Transfer(address indexed from, address indexed to, uint256 value);
 }
 
-pub fn get_address(xpub: XPub, index: u32) -> anyhow::Result<Address> {
-    let child_xpub = xpub.derive_child(index)?;
-    let verifying_key = child_xpub.as_ref();
-
-    Ok(Address::from_public_key(&verifying_key))
+#[derive(Debug, Clone)]
+pub struct EvmBlockchain {
+    config: Arc<ChainConfig>,
+    sender: mpsc::Sender<PaymentEvent>,
 }
 
-pub async fn listen_on(
-    config: Arc<ChainConfig>,
-    sender: mpsc::Sender<PaymentEvent>
-) -> anyhow::Result<()> {
-    let rpc_url = Url::parse(&config.rpc_url)?;
-    let provider = ProviderBuilder::new().connect_http(rpc_url);
+impl EvmBlockchain {
+    pub fn new(
+        config: Arc<ChainConfig>,
+        sender: mpsc::Sender<PaymentEvent>
+    ) -> Self {
+        Self { config, sender }
+    }
+}
 
-    let mut last_block_num = match provider.get_block_number().await {
-        Ok(n) => n,
-        Err(e) => {
-            eprintln!("failed to get latest block number: {}. retrying in 5s...", e);
-            tokio::time::sleep(Duration::from_secs(5)).await;
-            provider.get_block_number().await?
-        }
-    };
+impl BlockchainAdapter for EvmBlockchain {
+    fn derive_address(&self, index: u32) -> anyhow::Result<String> {
+        let xpub = XPub::from_str(&self.config.xpub)?;
 
-    if last_block_num <= LAG { return Ok(()); } // better to be safe than sorry
+        let child_xpub = xpub.derive_child(index)?;
+        let verifying_key = child_xpub.as_ref();
 
-    loop {
-        let current_block_num = match provider.get_block_number().await {
+        Ok(Address::from_public_key(&verifying_key).to_string())
+    }
+
+    async fn listen(&self) -> anyhow::Result<()> {
+        let rpc_url = Url::parse(&self.config.rpc_url)?;
+        let provider = ProviderBuilder::new().connect_http(rpc_url);
+
+        let mut last_block_num = match provider.get_block_number().await {
             Ok(n) => n,
             Err(e) => {
-                eprintln!("failed to get latest block number: {}. sleep 2s...", e);
-                tokio::time::sleep(Duration::from_secs(2)).await;
-                continue
+                eprintln!("failed to get latest block number: {}. retrying in 5s...", e);
+                tokio::time::sleep(Duration::from_secs(5)).await;
+                provider.get_block_number().await?
             }
-        } - LAG;
+        };
 
-        if current_block_num <= last_block_num {
-            tokio::time::sleep(Duration::from_secs(2)).await;
-            continue;
-        }
+        if last_block_num <= LAG { return Ok(()); } // better to be safe than sorry
 
-        for block_num in (last_block_num + 1)..=current_block_num {
-            println!("processing block {}...", block_num);
+        loop {
+            let current_block_num = match provider.get_block_number().await {
+                Ok(n) => n,
+                Err(e) => {
+                    eprintln!("failed to get latest block number: {}. sleep 2s...", e);
+                    tokio::time::sleep(Duration::from_secs(2)).await;
+                    continue
+                }
+            } - LAG;
 
-            if let Some(block) = provider
-                .get_block_by_number(block_num.into())
-                .full()
-                .await
-                .ok()
-                .flatten()
-            {
-                let addresses = {
-                    let guard = config.watch_addresses.read().unwrap();
-                    guard.clone()
-                };
+            if current_block_num <= last_block_num {
+                tokio::time::sleep(Duration::from_secs(2)).await;
+                continue;
+            }
 
-                let transactions = process_block(&addresses, block)
-                    .unwrap_or_default();
-                for tx in transactions {
-                    let amount_human = format_units(tx.value(), config.decimals)?;
+            for block_num in (last_block_num + 1)..=current_block_num {
+                println!("processing block {}...", block_num);
 
-                    let event = PaymentEvent {
-                        network: config.name.clone(),
-                        tx_hash: tx.tx_hash(),
-                        from: tx.from(),
-                        to: tx.to().unwrap_or_default(), // default is unreachable, but it's better
-                                                         // to keep this instead of ::unwrap()
-                        token: config.native_symbol.clone(),
-                        amount: amount_human,
-                        amount_raw: tx.value(),
-                        decimals: config.decimals,
+                if let Some(block) = provider
+                    .get_block_by_number(block_num.into())
+                    .full()
+                    .await
+                    .ok()
+                    .flatten()
+                {
+                    let addresses = {
+                        let guard = self.config.watch_addresses.read().unwrap();
+                        guard.clone()
                     };
 
-                    let _ = sender.send(event).await;
+                    let transactions = process_block(&addresses, block)
+                        .unwrap_or_default();
+                    for tx in transactions {
+                        let amount_human = format_units(tx.value(), self.config.decimals)?;
+
+                        let event = PaymentEvent {
+                            network: self.config.name.clone(),
+                            tx_hash: tx.tx_hash(),
+                            from: tx.from().to_string(),
+                            to: tx.to().unwrap_or_default().to_string(), // default is unreachable,
+                            // but it's better to keep this instead of ::unwrap()
+                            token: self.config.native_symbol.clone(),
+                            amount: amount_human,
+                            amount_raw: tx.value(),
+                            decimals: self.config.decimals,
+                        };
+
+                        let _ = self.sender.send(event).await;
+                    }
                 }
+
+                let config = self.config.clone();
+                let sender = self.sender.clone();
+                process_logs(config, block_num, &provider, sender).await;
             }
 
-            let config = config.clone();
-            let sender = sender.clone();
-            process_logs(config, block_num, &provider, sender).await;
+            last_block_num = current_block_num;
         }
+    }
 
-        last_block_num = current_block_num;
+    fn config(&self) -> Arc<ChainConfig> {
+        self.config.clone()
     }
 }
 
 fn process_block(
-    addresses: &HashSet<Address>,
+    addresses: &HashSet<String>,
     block: Block,
 ) -> anyhow::Result<Vec<RpcTransaction>> {
     let txs = block.into_transactions_vec();
@@ -117,7 +139,7 @@ fn process_block(
         .into_iter()
         .filter(|tx| {
             tx.to().map_or(false, |to|
-                addresses.contains(&to))
+                addresses.contains(&to.to_string()))
         })
         .collect();
 
@@ -131,7 +153,7 @@ async fn process_logs(
     sender: mpsc::Sender<PaymentEvent>,
 ) {
     let token_addresses: Vec<Address> = config.tokens.read().unwrap().iter()
-        .map(|t| t.contract)
+        .map(|t| Address::from_str(&t.contract).unwrap_or_default())
         .collect();
 
     if token_addresses.is_empty() { return; }
@@ -160,11 +182,11 @@ async fn process_logs(
                 guard.clone()
             };
 
-            if addresses.contains(&event_data.to) {
+            if addresses.contains(&event_data.to.to_string()) {
                 let token_conf = {
                     let guard = config.tokens.read().unwrap();
                     let maybe_conf = guard.iter()
-                        .find(|t| t.contract == event_data.address);
+                        .find(|t| t.contract == event_data.address.to_string());
                         // .unwrap(); // trust me bro :)
 
                     match maybe_conf.cloned() {
@@ -184,8 +206,8 @@ async fn process_logs(
                 let event = PaymentEvent {
                     network: config.name.clone(),
                     tx_hash: log.transaction_hash.unwrap_or_default(),
-                    from: event_data.from,
-                    to: event_data.to,
+                    from: event_data.from.to_string(),
+                    to: event_data.to.to_string(),
                     token: token_conf.symbol.clone(),
                     amount: amount_human,
                     amount_raw: event_data.value,

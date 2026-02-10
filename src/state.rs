@@ -1,8 +1,7 @@
-use crate::chain;
+use crate::chain::{Blockchain, BlockchainAdapter};
 use crate::config::{ChainConfig, MinChainConfig, TokenConfig};
 use crate::model::{Invoice, InvoiceStatus, PaymentEvent};
 use alloy::primitives::utils::format_units;
-use alloy::primitives::Address;
 use dashmap::DashMap;
 use std::collections::HashMap;
 use std::ops::Deref;
@@ -16,11 +15,10 @@ pub struct AppState {
     pub tx: Sender<PaymentEvent>,
     pub rx: Mutex<Receiver<PaymentEvent>>,
 
-    // key = chain_config.name; value = chain_config
-    pub chains: RwLock<HashMap<String, Arc<ChainConfig>>>,
+    pub adapters: RwLock<HashMap<String, Arc<Blockchain>>>,
     pub active_chains: RwLock<HashMap<String, JoinHandle<()>>>,
 
-    pub active_invoices: DashMap<Address, Invoice>,
+    pub active_invoices: DashMap<String, Invoice>,
 }
 
 impl AppState {
@@ -30,7 +28,7 @@ impl AppState {
         Self {
             tx,
             rx: Mutex::new(rx),
-            chains: RwLock::new(HashMap::new()),
+            adapters: RwLock::new(HashMap::new()),
             active_chains: RwLock::new(HashMap::new()),
             active_invoices: DashMap::new(),
         }
@@ -84,36 +82,39 @@ impl AppState {
                         continue
                     }
 
-                    let amount_human = format_units(invoice.paid, event.decimals)
-                        .unwrap_or(invoice.paid.to_string());
-
                     if invoice.status == InvoiceStatus::Paid {
-                        println!("(unreachable) invoice is already paid but {} received {} {}",
-                                 invoice.address, amount_human, invoice.token)
+                        println!("(unreachable) invoice is already paid but {} received something",
+                                 invoice.address)
                     }
 
-                    invoice.paid += event.amount_raw;
+                    invoice.paid_raw += event.amount_raw;
 
-                    println!("\npaid {}/{} on {} (index {})",
-                             amount_human,
+                    let paid = format_units(invoice.paid_raw, event.decimals)
+                        .unwrap_or(invoice.paid_raw.to_string());
+
+                    println!("\npaid {}/{} {} on {} (index {})",
+                             paid,
                              invoice.amount,
+                             invoice.token,
                              invoice.address,
                              invoice.address_index);
 
-                    let fully_paid = invoice.paid >= invoice.amount_raw;
+                    invoice.paid = paid;
+
+                    let fully_paid = invoice.paid_raw >= invoice.amount_raw;
                     if fully_paid {
                         invoice.status = InvoiceStatus::Paid;
                     }
 
-                    (fully_paid, invoice.id.clone(), invoice.address)
+                    (fully_paid, invoice.id.clone(), invoice.address.clone())
                 };
 
                 if is_fully_paid {
                     println!("invoice {} is fully paid!", invoice_id);
 
                     let maybe_chain_config = {
-                        let guard = self.chains.read().await;
-                        guard.get(&event.network).cloned()
+                        let guard = self.adapters.read().await;
+                        guard.get(&event.network).map(|a| a.config())
                     };
 
                     if let Some(chain_config) = maybe_chain_config {
@@ -143,7 +144,7 @@ impl AppState {
                     let invoice = entry.value();
                     if invoice.status == InvoiceStatus::Pending && invoice.expires_at < now {
                         expired_addresses.push(
-                            (invoice.address, invoice.network.clone(), invoice.id.clone()));
+                            (invoice.address.clone(), invoice.network.clone(), invoice.id.clone()));
                     }
                 }
 
@@ -155,8 +156,8 @@ impl AppState {
                         inv.status = InvoiceStatus::Expired;
                     }
 
-                    if let Some(chain) = self.chains.read().await.get(&network) {
-                        chain.watch_addresses.write().unwrap().remove(&address);
+                    if let Some(chain) = self.adapters.read().await.get(&network) {
+                        chain.config().watch_addresses.write().unwrap().remove(&address);
                     }
                 }
             }
@@ -171,11 +172,12 @@ impl AppState {
     ) -> anyhow::Result<()> {
         let name = chain.name.clone();
 
-        if self.chains.read().await.contains_key(&name) {
+        if self.adapters.read().await.contains_key(&name) {
             anyhow::bail!("chain '{}' already exists", name);
         }
 
-        self.chains.write().await.insert(name.clone(), Arc::new(chain));
+        self.adapters.write().await.insert(name.clone(), Arc::new(Blockchain::new(Arc::new(chain),
+                                                                                  self.tx.clone())));
 
         self.start_listening(name).await?;
 
@@ -183,11 +185,11 @@ impl AppState {
     }
 
     pub async fn get_chains(&self) -> Vec<MinChainConfig> {
-        let chains = self.chains.read().await;
+        let chains = self.adapters.read().await;
 
         chains.iter()
             .map(|x| {
-                x.1.deref().into()
+                x.1.config().deref().into()
             })
             .collect()
     }
@@ -196,14 +198,15 @@ impl AppState {
         &self,
         name: &str
     ) -> MinChainConfig {
-        let chains = self.chains.read().await;
+        let chains = self.adapters.read().await;
 
         chains.iter()
-            .find(|x| x.1.name == name)
+            .find(|x| x.1.config().name == name)
             .map(|x| {
-                x.1.deref()
+                x.1.config()
             })
             .unwrap()
+            .deref()
             .into()
     }
 
@@ -213,7 +216,7 @@ impl AppState {
     ) -> anyhow::Result<()> {
         self.stop_listening(name.to_string()).await?;
 
-        self.chains.write().await.remove(name);
+        self.adapters.write().await.remove(name);
 
         Ok(())
     }
@@ -223,15 +226,15 @@ impl AppState {
         chain_name: String,
         token: TokenConfig
     ) -> anyhow::Result<()> {
-        let guard = self.chains.read().await;
+        let guard = self.adapters.read().await;
 
-        let maybe_config = guard.get(&chain_name);
+        let maybe_adapter = guard.get(&chain_name);
 
-        let Some(chain_config) = maybe_config else {
+        let Some(adapter) = maybe_adapter else {
             anyhow::bail!("chain '{}' does not exist", chain_name);
         };
 
-        chain_config.tokens.write().unwrap().insert(token);
+        adapter.config().tokens.write().unwrap().insert(token);
 
         Ok(())
     }
@@ -241,13 +244,15 @@ impl AppState {
         chain_name: String,
         symbol: String,
     ) -> anyhow::Result<()> {
-        let guard = self.chains.read().await;
+        let guard = self.adapters.read().await;
 
-        let maybe_config = guard.get(&chain_name);
+        let maybe_adapter = guard.get(&chain_name);
 
-        let Some(chain_config) = maybe_config else {
+        let Some(adapter) = maybe_adapter else {
             anyhow::bail!("chain '{}' does not exist", chain_name);
         };
+
+        let chain_config = adapter.config();
 
         // maybe_TokenConfig
         let mb_tc = chain_config.tokens.read().unwrap().iter()
@@ -267,13 +272,13 @@ impl AppState {
         &self,
         chain_name: String
     ) -> anyhow::Result<Vec<TokenConfig>> {
-        let guard = self.chains.read().await;
+        let guard = self.adapters.read().await;
 
         let Some(chain) = guard.get(&chain_name) else {
             anyhow::bail!("chain '{}' does not exist", chain_name);
         };
 
-        Ok(chain.tokens.read().unwrap().iter().cloned().collect())
+        Ok(chain.config().tokens.read().unwrap().iter().cloned().collect())
     }
 
     pub async fn get_token(
@@ -281,13 +286,13 @@ impl AppState {
         chain_name: String,
         symbol: String,
     ) -> anyhow::Result<TokenConfig> {
-        let guard = self.chains.read().await;
+        let guard = self.adapters.read().await;
 
         let Some(chain) = guard.get(&chain_name) else {
             anyhow::bail!("chain '{}' does not exist", chain_name);
         };
 
-        let mb_tc = chain.tokens.read().unwrap().iter()
+        let mb_tc = chain.config().tokens.read().unwrap().iter()
             .find(|x| x.symbol == symbol)
             .cloned();
 
@@ -303,18 +308,19 @@ impl AppState {
             anyhow::bail!("chain {} is already listening", chain);
         }
 
-        let maybe_config = { self.chains.read().await.get(&chain).cloned() };
-        let chain_config = match maybe_config {
-            Some(cc) => cc,
+        let maybe_adapter = { self.adapters.read().await.get(&chain).cloned() };
+        let adapter = match maybe_adapter {
+            Some(a) => a,
             None => {
                 anyhow::bail!("chain {} not found", chain);
             }
         };
 
-        let tx = self.tx.clone();
+        let chain_config = adapter.config();
+
         let listener = tokio::spawn(async move {
             let chain_name = chain_config.name.clone();
-            if let Err(e) = chain::listen_on(chain_config, tx).await {
+            if let Err(e) = adapter.listen().await {
                 eprintln!("{} listener died: {}", chain_name, e);
             }
         });

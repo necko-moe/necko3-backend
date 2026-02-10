@@ -1,11 +1,11 @@
+use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
+use std::sync::Arc;
+use tokio::sync::mpsc;
+use crate::chain::Blockchain::Evm;
+use crate::chain::evm::EvmBlockchain;
 use crate::config::ChainConfig;
 use crate::model::PaymentEvent;
-use std::sync::Arc;
-use alloy::primitives::Address;
-use coins_bip32::prelude::XPub;
-use serde::{Deserialize, Serialize};
-use tokio::sync::mpsc;
 
 pub mod evm;
 
@@ -22,21 +22,44 @@ impl Display for ChainType {
     }
 }
 
-pub fn listen_on(
-    config: Arc<ChainConfig>,
-    sender: mpsc::Sender<PaymentEvent>,
-) -> impl Future<Output = anyhow::Result<()>> {
-    match config.chain_type {
-        ChainType::EVM => evm::listen_on(config, sender),
+pub trait BlockchainAdapter: Sync + Send {
+    fn derive_address(&self, index: u32) -> anyhow::Result<String>;
+    async fn listen(&self) -> anyhow::Result<()>;
+    fn config(&self) -> Arc<ChainConfig>;
+}
+
+#[derive(Debug, Clone)]
+pub enum Blockchain {
+    Evm(EvmBlockchain),
+}
+
+impl Blockchain {
+    pub fn new(
+        config: Arc<ChainConfig>, 
+        sender: mpsc::Sender<PaymentEvent>
+    ) -> Self {
+        match config.chain_type {
+            ChainType::EVM => Evm(EvmBlockchain::new(config, sender)),
+        }
     }
 }
 
-pub fn get_address(
-    chain_type: ChainType,
-    xpub: XPub,
-    index: u32
-) -> anyhow::Result<Address> {
-    match chain_type {
-        ChainType::EVM => evm::get_address(xpub, index),
+impl BlockchainAdapter for Blockchain {
+    fn derive_address(&self, index: u32) -> anyhow::Result<String> {
+        match self {
+            Evm(bc) => bc.derive_address(index),
+        }
+    }
+
+    async fn listen(&self) -> anyhow::Result<()> {
+        match self {
+            Evm(bc) => bc.listen().await,
+        }
+    }
+
+    fn config(&self) -> Arc<ChainConfig> {
+        match self {
+            Evm(bc) => bc.config(),
+        }
     }
 }

@@ -1,28 +1,29 @@
-use crate::chain;
+use crate::chain::BlockchainAdapter;
 use crate::model::{CreateInvoiceReq, Invoice, InvoiceStatus};
 use crate::state::AppState;
 use alloy::primitives::utils::parse_units;
 use alloy::primitives::U256;
 use axum::extract::{Path, State};
 use axum::Json;
-use coins_bip32::prelude::XPub;
-use std::str::FromStr;
+use std::ops::Deref;
 use std::sync::Arc;
 
 pub async fn create_invoice(
     State(state): State<Arc<AppState>>,
     Json(payload): Json<CreateInvoiceReq>,
 ) -> String {
-    let chain_config = {
-        let guard = state.chains.read().await;
-        let maybe_config = guard.get(&payload.network);
+    let adapter = {
+        let guard = state.adapters.read().await;
+        let maybe_adapter = guard.get(&payload.network);
 
-        let Some(cc) = maybe_config.cloned() else {
+        let Some(cc) = maybe_adapter else {
             return format!("Error: network '{}' is not currently supported", payload.network);
         };
 
-        cc
+        cc.deref().clone()
     };
+    
+    let chain_config = adapter.config();
 
     let token_decimals = {
         let guard = chain_config.tokens.read().unwrap();
@@ -50,14 +51,7 @@ pub async fn create_invoice(
         return "Error: no free slots available".into();
     };
 
-    // todo: this is actually hardcoded EVM shit (fix this)
-    let xpub_str = "xpub6EeaXhbbgvtV6KF1fvBeEn7DZnd1Gd4xh36eMAAeBB4KA73ZV5pXmjyddjPziE5QqkcoH\
-    tRRpkce9UP5qxsd2Q9qi3zmeXtEz5sc7NFGcvN";
-    let xpub = XPub::from_str(xpub_str)
-        .expect("Invalid Xpub string");
-    // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-    let address = match chain::get_address(chain_config.chain_type, xpub, index) {
+    let address = match adapter.derive_address(index) {
         Ok(a) => a,
         Err(e) => {
             return format!("Error: failed to get address (index {}) for {} chain: {}",
@@ -68,10 +62,11 @@ pub async fn create_invoice(
     let invoice = Invoice {
         id: uuid::Uuid::new_v4().to_string(),
         address_index: index,
-        address,
+        address: address.clone(),
         amount: payload.amount,
         amount_raw: amount_raw.into(),
-        paid: U256::from(0),
+        paid: "0".to_string(),
+        paid_raw: U256::from(0),
         token: payload.token,
         network: payload.network,
         created_at: chrono::Utc::now(),
@@ -79,7 +74,7 @@ pub async fn create_invoice(
         status: InvoiceStatus::Pending,
     };
 
-    state.active_invoices.insert(address, invoice);
+    state.active_invoices.insert(address.clone(), invoice);
     chain_config.watch_addresses.write().unwrap().insert(address.clone());
 
     format!("Pay to: {:?} (index {})", address, index)
