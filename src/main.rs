@@ -21,10 +21,15 @@ async fn main() -> anyhow::Result<()> {
     let db_type = std::env::var("DATABASE_TYPE")
         .expect("DATABASE_TYPE must be set");
 
+    let max_connections = std::env::var("DATABASE_MAX_CONNECTIONS")
+        .unwrap_or_else(|_| "20".into())
+        .parse::<u32>()
+        .unwrap_or(20);
+
     let db: Database = match db_type.as_str() {
         "postgres" => {
             let pool = PgPoolOptions::new()
-                .max_connections(10)
+                .max_connections(max_connections)
                 .connect(&database_url)
                 .await?;
 
@@ -38,7 +43,10 @@ async fn main() -> anyhow::Result<()> {
         _ => panic!("Unknown DB type")
     };
 
-    let state = AppState::init(db, Duration::from_secs(30));
+    let state = match AppState::init(db, Duration::from_secs(30)).await {
+        Ok(state) => state,
+        Err(e) => panic!("Failed to init AppState: {}", e),
+    };
 
     api::serve(state).await?;
 

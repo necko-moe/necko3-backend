@@ -316,13 +316,9 @@ impl DatabaseAdapter for MockDatabase {
             None => anyhow::bail!("invoice '{}' does not exist", uuid),
         };
 
-        let decimals = self.get_token_decimals(&inv.network, &inv.token).await?
-            .ok_or_else(|| anyhow::anyhow!("chain or token ('{}'/'{}') does not exist",
-                inv.network, inv.token))?;
-
         inv.paid_raw += amount_raw;
 
-        let amount_human = format_units(inv.paid_raw, decimals)?;
+        let amount_human = format_units(inv.paid_raw, inv.decimals)?;
         inv.paid = amount_human;
 
         Ok((inv.paid_raw, inv.paid.clone()))

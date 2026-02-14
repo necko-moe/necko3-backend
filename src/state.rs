@@ -28,14 +28,15 @@ impl AppState {
         (state, rx)
     }
 
-    pub fn init(db: Database, janitor_timeout: Duration) -> Arc<AppState> {
+    pub async fn init(db: Database, janitor_timeout: Duration) -> anyhow::Result<Arc<AppState>> {
         let (state, rx) = Self::new(db);
         let state_arc = Arc::new(state);
-
+        
         state_arc.clone().start_invoice_watcher(rx);
         state_arc.clone().start_janitor(janitor_timeout);
+        state_arc.clone().listen_all().await?;
 
-        state_arc
+        Ok(state_arc)
     }
 
     pub async fn get_free_slot(&self, chain_name: &str) -> Option<u32> {
@@ -135,21 +136,6 @@ impl AppState {
                 for (address, network, invoice_id) in expired_addresses {
                     println!("marking invoice {} (address {}) as expired", invoice_id, address);
 
-                    // // I think I was drunk writing this
-                    // let addresses_pending_count = match self.db.get_invoices_by_address_and_status(
-                    //     &address, InvoiceStatus::Pending).await
-                    // {
-                    //     Ok(invoices) => invoices.len(),
-                    //     Err(e) => {
-                    //         eprintln!("failed to get pending invoices for {}: {}", address, e);
-                    //         continue
-                    //     }
-                    // };
-                    //
-                    // if addresses_pending_count >= 1 {
-                    //     continue;
-                    // }
-
                     to_remove.entry(network)
                         .or_insert_with(Vec::new)
                         .push(address);
@@ -167,6 +153,22 @@ impl AppState {
 }
 
 impl AppState {
+    pub async fn listen_all(self: Arc<Self>) -> anyhow::Result<()> {
+        for chain in self.db.get_chains().await? {
+            let chain_name = chain.name.clone();
+            let blockchain = Blockchain::new(self.clone(), chain.chain_type,
+                                             &chain_name, Some(self.tx.clone()));
+            let listener = tokio::spawn(async move {
+                if let Err(e) = blockchain.listen().await {
+                    eprintln!("{} listener died: {}", chain_name, e);
+                }
+            });
+
+            self.active_chains.write().await.insert(chain.name.clone(), listener);
+        }
+        
+        Ok(())
+    }
     pub async fn start_listening(self: Arc<Self>, chain: String) -> anyhow::Result<()> {
         if self.active_chains.read().await.contains_key(&chain) {
             anyhow::bail!("chain {} is already listening", chain);

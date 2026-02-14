@@ -16,6 +16,7 @@ use axum::http::StatusCode;
     responses(
         (status = 201, description = "Invoice created", body = ApiResponse<Invoice>),
         (status = 400, description = "Bad Request", body = ApiResponse<Empty>),
+        (status = 404, description = "Chain/token decimals not found", body = ApiResponse<Empty>),
         (status = 500, description = "Server Error", body = ApiResponse<Empty>)
     ),
     tag = "Invoices"
@@ -44,6 +45,10 @@ pub async fn create_invoice(
     let address = blockchain.derive_address(index).await
         .map_err(|e| ApiError::InternalServerError(format!("Failed to derive address: {}", e)))?;
 
+    let decimals = state.db.get_token_decimals(&payload.network, &payload.token).await
+        .map_err(|e| ApiError::InternalServerError(e.to_string()))?
+        .ok_or_else(|| ApiError::NotFound("Chain/token decimals not found".to_owned()))?;
+
     let invoice = Invoice {
         id: uuid::Uuid::new_v4().to_string(),
         address_index: index,
@@ -54,6 +59,7 @@ pub async fn create_invoice(
         paid_raw: U256::from(0),
         token: payload.token,
         network: payload.network.clone(),
+        decimals,
         created_at: chrono::Utc::now(),
         expires_at: chrono::Utc::now() + chrono::Duration::minutes(15),
         status: InvoiceStatus::Pending,

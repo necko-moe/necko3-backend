@@ -4,6 +4,7 @@ use axum::Json;
 use axum::response::{IntoResponse, Response};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use strum::{AsRefStr, Display, EnumString};
 use utoipa::ToSchema;
 
 #[derive(Debug, Clone)]
@@ -18,7 +19,9 @@ pub struct PaymentEvent {
     pub decimals: u8,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, ToSchema)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, ToSchema,
+    Display, EnumString, AsRefStr)]
+#[strum(serialize_all = "PascalCase")]
 pub enum InvoiceStatus {
     Pending,
     Paid,
@@ -38,6 +41,7 @@ pub struct Invoice {
     pub paid_raw: U256,
     pub token: String,
     pub network: String,
+    pub decimals: u8,
     pub created_at: DateTime<Utc>,
     pub expires_at: DateTime<Utc>,
     pub status: InvoiceStatus,

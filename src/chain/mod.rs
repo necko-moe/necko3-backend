@@ -3,24 +3,19 @@ use crate::chain::Blockchain::Evm;
 use crate::model::PaymentEvent;
 use crate::state::AppState;
 use serde::{Deserialize, Serialize};
-use std::fmt::{Display, Formatter};
+use std::fmt::Display;
 use std::sync::Arc;
+use strum::{AsRefStr, Display, EnumString};
 use tokio::sync::mpsc::Sender;
 use utoipa::ToSchema;
 
 pub mod evm;
 
-#[derive(Debug, Copy, Clone, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize, ToSchema,
+    Display, EnumString, AsRefStr)]
+#[strum(serialize_all = "UPPERCASE")]
 pub enum ChainType {
     EVM
-}
-
-impl Display for ChainType {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ChainType::EVM => write!(f, "EVM"),
-        }
-    }
 }
 
 pub trait BlockchainAdapter: Sync + Send {
