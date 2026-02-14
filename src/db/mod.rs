@@ -1,7 +1,7 @@
 use crate::config::{ChainConfig, TokenConfig};
 use crate::db::mock::MockDatabase;
 use crate::db::postgres::Postgres;
-use crate::model::{Invoice, InvoiceStatus};
+use crate::model::{Invoice, InvoiceStatus, UpdateChainReq};
 use alloy::primitives::U256;
 use std::collections::HashMap;
 
@@ -21,6 +21,8 @@ pub trait DatabaseAdapter: Send + Sync {
     async fn remove_chain(&self, chain_name: &str) -> anyhow::Result<()>;
     async fn remove_chain_by_id(&self, id: u32) -> anyhow::Result<()>;
     async fn chain_exists(&self, chain_name: &str) -> anyhow::Result<bool>;
+    async fn update_chain_partial(&self, chain_name: &str, update_chain_req: &UpdateChainReq) 
+        -> anyhow::Result<()>;
 
     async fn get_watch_addresses(&self, chain_name: &str) -> anyhow::Result<Option<Vec<String>>>;
     async fn remove_watch_address(&self, chain_name: &str, address: &str) -> anyhow::Result<()>;
@@ -152,6 +154,13 @@ impl DatabaseAdapter for Database {
         match self {
             Database::Mock(db) => db.chain_exists(chain_name).await,
             Database::Postgres(db) => db.chain_exists(chain_name).await,
+        }
+    }
+
+    async fn update_chain_partial(&self, chain_name: &str, update_chain_req: &UpdateChainReq) -> anyhow::Result<()> {
+        match self {
+            Database::Mock(db) => db.update_chain_partial(chain_name, update_chain_req).await,
+            Database::Postgres(db) => db.update_chain_partial(chain_name, update_chain_req).await,
         }
     }
 

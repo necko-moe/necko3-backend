@@ -4,7 +4,7 @@ pub use token::*;
 
 use crate::config::ChainConfig;
 use crate::db::DatabaseAdapter;
-use crate::model::{ApiError, ApiResponse, Empty};
+use crate::model::{ApiError, ApiResponse, Empty, UpdateChainReq};
 use crate::state::AppState;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
@@ -28,7 +28,7 @@ pub async fn add_chain(
     state.db.add_chain(&payload).await
         .map_err(|e| ApiError::InternalServerError(format!("DB Error: {}", e)))?;
 
-    state.start_listening(payload.name).await
+    state.start_listening(&payload.name).await
         .map_err(|e| ApiError::InternalServerError(format!("Listener error: {}", e.to_string())))?;
 
     Ok((StatusCode::CREATED, Json(ApiResponse::ok())))
@@ -83,7 +83,6 @@ pub async fn get_chain(
     ),
     responses(
         (status = 200, description = "Chain deleted", body = ApiResponse<Empty>),
-        (status = 404, description = "Chain not found", body = ApiResponse<Empty>),
         (status = 500, description = "Server Error", body = ApiResponse<Empty>)
     ),
     tag = "Chains"
@@ -97,6 +96,36 @@ pub async fn delete_chain(
 
     state.db.remove_chain(&name).await
         .map_err(|e| ApiError::InternalServerError(format!("DB Error: {}", e)))?;
+
+    Ok((StatusCode::OK, Json(ApiResponse::ok())))
+}
+
+#[utoipa::path(
+    patch,
+    path = "/chain/{name}",
+    request_body = UpdateChainReq,
+    params(
+        ("name" = String, Path, description = "Chain name")
+    ),
+    responses(
+        (status = 200, description = "Chain updated", body = ApiResponse<Empty>),
+        (status = 500, description = "Server Error", body = ApiResponse<Empty>)
+    ),
+    tag = "Chains"
+)]
+pub async fn update_chain(
+    State(state): State<Arc<AppState>>,
+    Path(name): Path<String>,
+    Json(payload): Json<UpdateChainReq>,
+) -> Result<(StatusCode, Json<ApiResponse<String>>), ApiError> {
+    state.db.update_chain_partial(&name, &payload).await
+        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+
+    state.stop_listening(&name).await
+        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+
+    state.start_listening(&name).await
+        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
 
     Ok((StatusCode::OK, Json(ApiResponse::ok())))
 }

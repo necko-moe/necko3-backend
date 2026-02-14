@@ -3,7 +3,6 @@ use crate::chain::Blockchain::Evm;
 use crate::model::PaymentEvent;
 use crate::state::AppState;
 use serde::{Deserialize, Serialize};
-use std::fmt::Display;
 use std::sync::Arc;
 use strum::{AsRefStr, Display, EnumString};
 use tokio::sync::mpsc::Sender;

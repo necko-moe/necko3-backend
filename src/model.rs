@@ -54,6 +54,13 @@ pub struct CreateInvoiceReq {
     pub network: String,
 }
 
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
+pub struct UpdateChainReq {
+    pub rpc_url: Option<String>,
+    pub last_processed_block: Option<u64>,
+    pub xpub: Option<String>,
+}
+
 #[derive(Serialize, ToSchema)]
 pub struct Empty {}
 

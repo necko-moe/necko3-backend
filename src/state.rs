@@ -9,6 +9,7 @@ use tokio::sync::{mpsc, RwLock};
 use tokio::task::JoinHandle;
 
 pub struct AppState {
+    pub api_key: String,
     pub tx: Sender<PaymentEvent>,
 
     pub db: Arc<Database>,
@@ -16,10 +17,11 @@ pub struct AppState {
 }
 
 impl AppState {
-    pub fn new(db: Database) -> (Self, Receiver<PaymentEvent>) {
+    pub fn new(db: Database, api_key: &str) -> (Self, Receiver<PaymentEvent>) {
         let (tx, rx): (Sender<PaymentEvent>, Receiver<PaymentEvent>) = mpsc::channel(100);
 
         let state = Self {
+            api_key: api_key.to_owned(),
             tx,
             db: Arc::new(db),
             active_chains: RwLock::new(HashMap::new()),
@@ -28,10 +30,10 @@ impl AppState {
         (state, rx)
     }
 
-    pub async fn init(db: Database, janitor_timeout: Duration) -> anyhow::Result<Arc<AppState>> {
-        let (state, rx) = Self::new(db);
+    pub async fn init(db: Database, api_key: &str, janitor_timeout: Duration) -> anyhow::Result<Arc<AppState>> {
+        let (state, rx) = Self::new(db, api_key);
         let state_arc = Arc::new(state);
-        
+
         state_arc.clone().start_invoice_watcher(rx);
         state_arc.clone().start_janitor(janitor_timeout);
         state_arc.clone().listen_all().await?;
@@ -166,15 +168,15 @@ impl AppState {
 
             self.active_chains.write().await.insert(chain.name.clone(), listener);
         }
-        
+
         Ok(())
     }
-    pub async fn start_listening(self: Arc<Self>, chain: String) -> anyhow::Result<()> {
-        if self.active_chains.read().await.contains_key(&chain) {
+    pub async fn start_listening(self: Arc<Self>, chain: &str) -> anyhow::Result<()> {
+        if self.active_chains.read().await.contains_key(chain) {
             anyhow::bail!("chain {} is already listening", chain);
         }
 
-        let maybe_chain_config = match self.db.get_chain(&chain).await {
+        let maybe_chain_config = match self.db.get_chain(chain).await {
             Ok(chain) => chain,
             Err(e) => {
                 anyhow::bail!("failed to get chain '{}': {}", chain, e);
@@ -194,18 +196,18 @@ impl AppState {
             }
         });
 
-        self.active_chains.write().await.insert(chain.clone(), listener);
+        self.active_chains.write().await.insert(chain.to_owned(), listener);
 
         Ok(())
     }
 
-    pub async fn stop_listening(&self, chain: &str) -> anyhow::Result<()> {
+    pub async fn stop_listening(&self, chain_name: &str) -> anyhow::Result<()> {
         let mut active_chains = self.active_chains.write().await;
 
-        if let Some(handle) = active_chains.remove(chain) {
+        if let Some(handle) = active_chains.remove(chain_name) {
             handle.abort();
         } else {
-            anyhow::bail!("chain {} is not listening", chain);
+            anyhow::bail!("chain {} is not listening", chain_name);
         }
 
         Ok(())

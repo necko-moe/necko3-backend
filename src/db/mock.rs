@@ -1,6 +1,6 @@
 use crate::config::{ChainConfig, TokenConfig};
 use crate::db::DatabaseAdapter;
-use crate::model::{Invoice, InvoiceStatus};
+use crate::model::{Invoice, InvoiceStatus, UpdateChainReq};
 use alloy::primitives::utils::format_units;
 use alloy::primitives::U256;
 use dashmap::DashMap;
@@ -92,6 +92,26 @@ impl DatabaseAdapter for MockDatabase {
 
     async fn chain_exists(&self, chain_name: &str) -> anyhow::Result<bool> {
         Ok(self.chains.read().unwrap().contains_key(chain_name))
+    }
+
+    async fn update_chain_partial(&self, chain_name: &str, update_chain_req: &UpdateChainReq) -> anyhow::Result<()> {
+        let mut guard = self.chains.write().unwrap();
+        let chain = guard.get_mut(chain_name)
+            .ok_or_else(|| anyhow::anyhow!("chain '{}' does not exist", chain_name))?;
+        
+        if let Some(xpub) = &update_chain_req.xpub {
+            chain.xpub = xpub.to_owned();
+        }
+        
+        if let Some(rpc_url) = &update_chain_req.rpc_url {
+            chain.rpc_url = rpc_url.to_owned();
+        }
+        
+        if let Some(last_processed_block) = update_chain_req.last_processed_block {
+            chain.last_processed_block = last_processed_block;
+        }
+        
+        Ok(())
     }
 
     async fn get_watch_addresses(&self, chain_name: &str) -> anyhow::Result<Option<Vec<String>>> {
