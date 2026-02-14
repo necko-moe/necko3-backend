@@ -30,7 +30,7 @@ impl Postgres {
 
         for row in sqlx::query(
             r#"SELECT id, name, rpc_url, chain_type, xpub, native_symbol, decimals,
-       last_processed_block FROM chains"#
+       last_processed_block, block_lag FROM chains"#
         )
             .fetch_all(&pool)
             .await?
@@ -50,6 +50,7 @@ impl Postgres {
                 native_symbol: row.get("native_symbol"),
                 decimals: row.get::<i16, _>("decimals") as u8,
                 last_processed_block: row.get::<i64, _>("last_processed_block") as u64,
+                block_lag: row.get::<i16, _>("block_lag") as u8,
                 watch_addresses: Arc::new(RwLock::new(HashSet::new())),
                 tokens: Arc::new(RwLock::new(HashSet::new())),
             };
@@ -314,6 +315,10 @@ impl DatabaseAdapter for Postgres {
             chain.last_processed_block = last_processed_block;
         }
 
+        if let Some(block_lag) = update_chain_req.block_lag {
+            chain.block_lag = block_lag;
+        }
+
         Ok(())
     }
 
@@ -372,6 +377,11 @@ impl DatabaseAdapter for Postgres {
     async fn get_rpc_url(&self, chain_name: &str) -> anyhow::Result<Option<String>> {
         Ok(self.chains_cache.read().unwrap().get(chain_name)
             .map(|c| c.rpc_url.clone()))
+    }
+
+    async fn get_block_lag(&self, chain_name: &str) -> anyhow::Result<Option<u8>> {
+        Ok(self.chains_cache.read().unwrap().get(chain_name)
+            .map(|c| c.block_lag))
     }
 
     async fn get_tokens(&self, chain_name: &str) -> anyhow::Result<Option<Vec<TokenConfig>>> {

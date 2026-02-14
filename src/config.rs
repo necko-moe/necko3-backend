@@ -20,6 +20,7 @@ pub struct ChainConfig {
     pub native_symbol: String,
     pub decimals: u8,
     pub last_processed_block: u64,
+    pub block_lag: u8,
 
     #[schema(ignore)]
     #[serde(skip)]

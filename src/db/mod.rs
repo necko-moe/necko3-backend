@@ -21,7 +21,7 @@ pub trait DatabaseAdapter: Send + Sync {
     async fn remove_chain(&self, chain_name: &str) -> anyhow::Result<()>;
     async fn remove_chain_by_id(&self, id: u32) -> anyhow::Result<()>;
     async fn chain_exists(&self, chain_name: &str) -> anyhow::Result<bool>;
-    async fn update_chain_partial(&self, chain_name: &str, update_chain_req: &UpdateChainReq) 
+    async fn update_chain_partial(&self, chain_name: &str, update_chain_req: &UpdateChainReq)
         -> anyhow::Result<()>;
 
     async fn get_watch_addresses(&self, chain_name: &str) -> anyhow::Result<Option<Vec<String>>>;
@@ -32,6 +32,7 @@ pub trait DatabaseAdapter: Send + Sync {
 
     async fn get_xpub(&self, chain_name: &str) -> anyhow::Result<Option<String>>;
     async fn get_rpc_url(&self, chain_name: &str) -> anyhow::Result<Option<String>>;
+    async fn get_block_lag(&self, chain_name: &str) -> anyhow::Result<Option<u8>>;
 
     // token
     async fn get_tokens(&self, chain_name: &str) -> anyhow::Result<Option<Vec<TokenConfig>>>;
@@ -203,6 +204,13 @@ impl DatabaseAdapter for Database {
         match self {
             Database::Mock(db) => db.get_rpc_url(chain_name).await,
             Database::Postgres(db) => db.get_rpc_url(chain_name).await,
+        }
+    }
+
+    async fn get_block_lag(&self, chain_name: &str) -> anyhow::Result<Option<u8>> {
+        match self {
+            Database::Mock(db) => db.get_block_lag(chain_name).await,
+            Database::Postgres(db) => db.get_block_lag(chain_name).await,
         }
     }
 

@@ -59,6 +59,7 @@ pub struct UpdateChainReq {
     pub rpc_url: Option<String>,
     pub last_processed_block: Option<u64>,
     pub xpub: Option<String>,
+    pub block_lag: Option<u8>,
 }
 
 #[derive(Serialize, ToSchema)]

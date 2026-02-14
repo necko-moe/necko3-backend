@@ -20,8 +20,6 @@ use tokio::sync::mpsc::Sender;
 use url::Url;
 use crate::config::TokenConfig;
 
-const LAG: u64 = 3;
-
 sol! {
     #[derive(Debug)]
     event Transfer(address indexed from, address indexed to, uint256 value);
@@ -76,7 +74,8 @@ impl BlockchainAdapter for EvmBlockchain {
             };
         }
 
-        if last_block_num <= LAG { return Ok(()); } // better to be safe than sorry
+        let block_lag = self.db.get_block_lag(&self.chain_name).await?
+            .ok_or_else(|| anyhow::anyhow!("chain {} does not exists", self.chain_name))?;
 
         loop {
             let current_block_num = match provider.get_block_number().await {
@@ -86,7 +85,7 @@ impl BlockchainAdapter for EvmBlockchain {
                     tokio::time::sleep(Duration::from_secs(2)).await;
                     continue
                 }
-            } - LAG;
+            }.saturating_sub(block_lag as u64);
 
             if current_block_num <= last_block_num {
                 tokio::time::sleep(Duration::from_secs(2)).await;

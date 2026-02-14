@@ -98,19 +98,23 @@ impl DatabaseAdapter for MockDatabase {
         let mut guard = self.chains.write().unwrap();
         let chain = guard.get_mut(chain_name)
             .ok_or_else(|| anyhow::anyhow!("chain '{}' does not exist", chain_name))?;
-        
+
         if let Some(xpub) = &update_chain_req.xpub {
             chain.xpub = xpub.to_owned();
         }
-        
+
         if let Some(rpc_url) = &update_chain_req.rpc_url {
             chain.rpc_url = rpc_url.to_owned();
         }
-        
+
         if let Some(last_processed_block) = update_chain_req.last_processed_block {
             chain.last_processed_block = last_processed_block;
         }
-        
+
+        if let Some(block_lag) = update_chain_req.block_lag {
+            chain.block_lag = block_lag;
+        }
+
         Ok(())
     }
 
@@ -175,6 +179,13 @@ impl DatabaseAdapter for MockDatabase {
     async fn get_rpc_url(&self, chain_name: &str) -> anyhow::Result<Option<String>> {
         match self.chains.read().unwrap().get(chain_name) {
             Some(c) => Ok(Some(c.rpc_url.clone())),
+            None => Ok(None),
+        }
+    }
+
+    async fn get_block_lag(&self, chain_name: &str) -> anyhow::Result<Option<u8>> {
+        match self.chains.read().unwrap().get(chain_name) {
+            Some(c) => Ok(Some(c.block_lag)),
             None => Ok(None),
         }
     }
