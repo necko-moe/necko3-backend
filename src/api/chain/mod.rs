@@ -2,10 +2,11 @@ pub mod token;
 
 pub use token::*;
 
-use crate::config::ChainConfig;
-use crate::db::DatabaseAdapter;
-use crate::model::{ApiError, ApiResponse, Empty, UpdateChainReq};
-use crate::state::AppState;
+use necko3_core::config::ChainConfig;
+use necko3_core::db::DatabaseAdapter;
+use crate::model::{ApiError, ApiResponse, Empty};
+use necko3_core::model::PartialChainUpdate as UpdateChainReq;
+use necko3_core::state::AppState;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;

@@ -1,65 +1,14 @@
-use alloy::primitives::{TxHash, U256};
 use axum::http::StatusCode;
-use axum::Json;
 use axum::response::{IntoResponse, Response};
-use chrono::{DateTime, Utc};
+use axum::Json;
 use serde::{Deserialize, Serialize};
-use strum::{AsRefStr, Display, EnumString};
 use utoipa::ToSchema;
-
-#[derive(Debug, Clone)]
-pub struct PaymentEvent {
-    pub network: String,
-    pub tx_hash: TxHash,
-    pub from: String,
-    pub to: String,
-    pub token: String,
-    pub amount: String,
-    pub amount_raw: U256,
-    pub decimals: u8,
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, ToSchema,
-    Display, EnumString, AsRefStr)]
-#[strum(serialize_all = "PascalCase")]
-pub enum InvoiceStatus {
-    Pending,
-    Paid,
-    Expired,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
-pub struct Invoice {
-    pub id: String,
-    pub address_index: u32,
-    pub address: String,
-    pub amount: String,
-    #[schema(value_type = String, example = "1000000000000000000")]
-    pub amount_raw: U256,
-    pub paid: String,
-    #[schema(value_type = String, example = "0")]
-    pub paid_raw: U256,
-    pub token: String,
-    pub network: String,
-    pub decimals: u8,
-    pub created_at: DateTime<Utc>,
-    pub expires_at: DateTime<Utc>,
-    pub status: InvoiceStatus,
-}
 
 #[derive(Debug, Clone, Deserialize, Serialize, ToSchema)]
 pub struct CreateInvoiceReq {
     pub amount: String,
     pub token: String,
     pub network: String,
-}
-
-#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
-pub struct UpdateChainReq {
-    pub rpc_url: Option<String>,
-    pub last_processed_block: Option<u64>,
-    pub xpub: Option<String>,
-    pub block_lag: Option<u8>,
 }
 
 #[derive(Serialize, ToSchema)]
@@ -115,7 +64,6 @@ where
     }
 }
 
-// Самое главное: превращаем AppError в HTTP ответ
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
         let (status, msg) = match self {

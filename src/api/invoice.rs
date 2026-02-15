@@ -1,9 +1,9 @@
-use crate::chain::{Blockchain, BlockchainAdapter};
-use crate::db::DatabaseAdapter;
-use crate::model::{ApiResponse, ApiError, CreateInvoiceReq, Empty, Invoice, InvoiceStatus};
-use crate::state::AppState;
-use alloy::primitives::utils::parse_units;
-use alloy::primitives::U256;
+use necko3_core::chain::{Blockchain, BlockchainAdapter};
+use necko3_core::db::DatabaseAdapter;
+use necko3_core::model::{Invoice, InvoiceStatus};
+use crate::model::{ApiResponse, ApiError, CreateInvoiceReq, Empty};
+use necko3_core::state::AppState;
+use alloy::primitives::{U256, utils::parse_units};
 use axum::extract::{Path, State};
 use axum::Json;
 use std::sync::Arc;
@@ -31,8 +31,8 @@ pub async fn create_invoice(
 
     let token_decimals = state.db.get_token_decimals(&payload.network, &payload.token).await
         .map_err(|e| ApiError::InternalServerError(e.to_string()))?
-        // who knows :)
-        .ok_or_else(|| ApiError::BadRequest(format!("Network '{}' not supported", payload.network)))?;
+        .ok_or_else(|| ApiError::BadRequest(format!("Token '{}' ({}) not supported",
+                                                    payload.token, payload.network)))?;
 
     let amount_raw = parse_units(&payload.amount, token_decimals)
         .map_err(|e| ApiError::BadRequest(format!("Invalid amount format: {}", e)))?;
@@ -45,10 +45,6 @@ pub async fn create_invoice(
     let address = blockchain.derive_address(index).await
         .map_err(|e| ApiError::InternalServerError(format!("Failed to derive address: {}", e)))?;
 
-    let decimals = state.db.get_token_decimals(&payload.network, &payload.token).await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?
-        .ok_or_else(|| ApiError::NotFound("Chain/token decimals not found".to_owned()))?;
-
     let invoice = Invoice {
         id: uuid::Uuid::new_v4().to_string(),
         address_index: index,
@@ -59,7 +55,7 @@ pub async fn create_invoice(
         paid_raw: U256::from(0),
         token: payload.token,
         network: payload.network.clone(),
-        decimals,
+        decimals: token_decimals,
         created_at: chrono::Utc::now(),
         expires_at: chrono::Utc::now() + chrono::Duration::minutes(15),
         status: InvoiceStatus::Pending,

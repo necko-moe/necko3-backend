@@ -1,10 +1,10 @@
-use crate::config::TokenConfig;
-use crate::state::AppState;
+use necko3_core::config::TokenConfig;
+use necko3_core::state::AppState;
 use axum::extract::{Path, State};
 use axum::Json;
 use std::sync::Arc;
 use axum::http::StatusCode;
-use crate::db::DatabaseAdapter;
+use necko3_core::db::DatabaseAdapter;
 use crate::model::{ApiError, ApiResponse, Empty};
 
 #[utoipa::path(
