@@ -9,6 +9,10 @@ pub struct CreateInvoiceReq {
     pub amount: String,
     pub token: String,
     pub network: String,
+    pub webhook_url: Option<String>,
+    pub webhook_secret: Option<String>,
+    /// seconds
+    pub expire_after: Option<u64>, 
 }
 
 #[derive(Serialize, ToSchema)]

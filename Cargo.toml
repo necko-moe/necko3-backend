@@ -3,6 +3,13 @@ name = "necko3"
 version = "0.1.0"
 edition = "2024"
 
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+panic = "abort"
+strip = "debuginfo"
+
 [dependencies]
 necko3-core = { git = "https://github.com/necko-moe/necko3-core.git" }
 
@@ -10,10 +17,11 @@ dotenvy = "0.15"
 tokio = { version = "1.49", features = ["full"] }
 anyhow = "1"
 
-# todo backend shouldn't know about alloy
-alloy = { version = "1.6", features = ["full"] }
+alloy = { version = "1.7", features = ["full"] }
 
 axum = "0.8"
+tower-http = { version = "0.6", features = ["cors", "trace", "compression-full"] }
+
 serde = { version = "1", features = ["derive"] }
 chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1.20", features = ["v4"] }

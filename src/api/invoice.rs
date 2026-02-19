@@ -3,6 +3,7 @@ use alloy::primitives::{utils::parse_units, U256};
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;
+use chrono::TimeDelta;
 use necko3_core::chain::BlockchainAdapter;
 use necko3_core::db::DatabaseAdapter;
 use necko3_core::model::{Invoice, InvoiceStatus};
@@ -54,8 +55,11 @@ pub async fn create_invoice(
         token: payload.token,
         network: payload.network.clone(),
         decimals: token_decimals,
+        webhook_url: payload.webhook_url,
+        webhook_secret: payload.webhook_secret,
         created_at: chrono::Utc::now(),
-        expires_at: chrono::Utc::now() + chrono::Duration::minutes(15),
+        expires_at: chrono::Utc::now()
+            + TimeDelta::seconds(payload.expire_after.unwrap_or(900) as i64),
         status: InvoiceStatus::Pending,
     };
 

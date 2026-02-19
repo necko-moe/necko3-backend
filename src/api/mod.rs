@@ -10,6 +10,9 @@ use necko3_core::state::AppState;
 use axum::routing::{delete, get, patch, post};
 use axum::{middleware, Router};
 use std::sync::Arc;
+use alloy::transports::http::reqwest::header::HeaderName;
+use axum::http::{header, HeaderValue, Method};
+use tower_http::cors::{AllowOrigin, CorsLayer};
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
@@ -60,8 +63,12 @@ use crate::api::auth::{auth_middleware, SecurityAddon};
 )]
 struct ApiDoc;
 
-pub async fn serve(state: Arc<AppState>) -> std::io::Result<()> {
-    let app = Router::new()
+pub async fn serve(
+    state: Arc<AppState>,
+    include_swagger: bool,
+    cors_layer: CorsLayer
+) -> std::io::Result<()> {
+    let mut app = Router::new()
         .route("/invoice", post(create_invoice))
         .route("/invoice", get(get_invoices))
         .route("/invoice/{id}", get(get_invoice_by_id))
@@ -79,14 +86,45 @@ pub async fn serve(state: Arc<AppState>) -> std::io::Result<()> {
         .route("/chain/{name}/token/{symbol}", delete(delete_token))
 
         .layer(middleware::from_fn_with_state(state.clone(), auth_middleware))
+        .layer(cors_layer)
 
-        .route("/health", get(|| async { "ok" }))
-        .merge(SwaggerUi::new("/swagger-ui")
+        .route("/health", get(|| async { "ok" }));
+
+
+    if include_swagger {
+        app = app.merge(SwaggerUi::new("/swagger-ui")
             .url("/api-docs/openapi.json", ApiDoc::openapi()))
-        .with_state(state);
+    }
 
     println!("Started listening on http://127.0.0.1:3000");
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:3000").await?;
-    axum::serve(listener, app).await
+    axum::serve(listener, app.with_state(state)).await
+}
+
+pub fn cors_from_str(raw_str: &str) -> CorsLayer {
+    let (origin, allow_credentials) = match raw_str.to_lowercase().as_str() {
+        "all" | "any" => (AllowOrigin::any(), false),
+        _ => {
+            let list = raw_str
+                .split(',')
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .map(|s| s.parse::<HeaderValue>()
+                    .expect("Bad origin"))
+                .collect::<Vec<HeaderValue>>();
+
+            (AllowOrigin::list(list), true)
+        }
+    };
+
+    CorsLayer::new()
+        .allow_origin(origin)
+        .allow_methods([Method::GET, Method::POST, Method::PATCH, Method::PUT, Method::DELETE])
+        .allow_headers([
+            header::CONTENT_TYPE,
+            header::ACCEPT,
+            HeaderName::from_static("x-api-key"),
+        ])
+        .allow_credentials(allow_credentials)
 }
