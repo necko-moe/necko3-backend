@@ -13,6 +13,8 @@ use std::sync::Arc;
 use alloy::transports::http::reqwest::header::HeaderName;
 use axum::http::{header, HeaderValue, Method};
 use tower_http::cors::{AllowOrigin, CorsLayer};
+use tower_http::trace::TraceLayer;
+use tracing::{error, info};
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
@@ -66,7 +68,8 @@ struct ApiDoc;
 pub async fn serve(
     state: Arc<AppState>,
     include_swagger: bool,
-    cors_layer: CorsLayer
+    cors_layer: CorsLayer,
+    bind_address: &str,
 ) -> std::io::Result<()> {
     let mut app = Router::new()
         .route("/invoice", post(create_invoice))
@@ -87,18 +90,24 @@ pub async fn serve(
 
         .layer(middleware::from_fn_with_state(state.clone(), auth_middleware))
         .layer(cors_layer)
+        .layer(TraceLayer::new_for_http())
 
         .route("/health", get(|| async { "ok" }));
 
 
     if include_swagger {
+        info!("Swagger UI enabled at /swagger-ui");
         app = app.merge(SwaggerUi::new("/swagger-ui")
             .url("/api-docs/openapi.json", ApiDoc::openapi()))
     }
 
-    println!("Started listening on http://127.0.0.1:3000");
+    info!("Starting server on http://{}", bind_address);
 
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:3000").await?;
+    let listener = tokio::net::TcpListener::bind(bind_address).await.map_err(|e| {
+        error!(address = %bind_address, error = %e, "Failed to bind TCP listener");
+        e
+    })?;
+    
     axum::serve(listener, app.with_state(state)).await
 }
 

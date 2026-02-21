@@ -16,6 +16,8 @@ necko3-core = { git = "https://github.com/necko-moe/necko3-core.git" }
 dotenvy = "0.15"
 tokio = { version = "1.49", features = ["full"] }
 anyhow = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 
 alloy = { version = "1.7", features = ["full"] }
 
