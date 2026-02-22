@@ -1,22 +1,4 @@
 services:
-  necko3:
-    build: .
-    image: necko3-backend:latest
-    container_name: necko3-backend
-    restart: always
-    env_file: .env
-    ports:
-      - "3000:3000"
-    depends_on:
-      - db
-    networks:
-      - necko3-network
-    healthcheck:
-      test: [ "CMD-SHELL", "curl -f http://$$BIND_ADDRESS/health" ]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
   db:
     image: postgres:18-alpine3.22
     container_name: necko3-postgres
@@ -30,8 +12,6 @@ services:
       - pg_data:/var/lib/postgresql/data
     ports:
       - "127.0.0.1:5432:5432"
-    networks:
-      - necko3-network
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB" ]
       interval: 5s
@@ -40,8 +20,3 @@ services:
 
 volumes:
   pg_data:
-
-networks:
-  necko3-network:
-    name: necko3-network
-    driver: bridge
