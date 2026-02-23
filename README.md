@@ -1,5 +1,7 @@
 <div align="center">
-  <img src=".github/static/necko3-3-1-round.png" alt="necko3-3-1-round.png" width="256"/>
+  <a href="https://github.com/necko-moe/necko3-backend">
+    <img src=".github/static/necko3-3-1-round.png" alt="necko3-3-1-round.png" width="256"/>
+  </a>
   <h1>necko3-backend</h1>
 
   <a href="https://github.com/necko-moe/necko3-backend/stargazers">
@@ -101,7 +103,7 @@ Next, download the binary from Releases for your architecture, place it next to 
 mkdir /opt/necko3 && cd /opt/necko3
 
 # Replace x86_64 with aarch64 if you are on ARM64
-curl -o necko3 https://github.com/necko-moe/necko3-backend/releases/latest/download/necko3-linux-x86_64
+wget -o necko3 https://github.com/necko-moe/necko3-backend/releases/latest/download/necko3-linux-x86_64
 
 # Create a separate tmux session so the binary keeps spinning regardless of your SSH connection
 # https://tmuxcheatsheet.com/ 
@@ -127,7 +129,7 @@ The backend will be available on port `3000` (you can change `BIND_ADDRESS` in `
 mkdir /opt/necko3 && cd /opt/necko3
 
 # Replace x86_64 with aarch64 if you are on ARM64
-curl -o necko3 https://github.com/necko-moe/necko3-backend/releases/latest/download/necko3-linux-x86_64
+wget -o necko3 https://github.com/necko-moe/necko3-backend/releases/latest/download/necko3-linux-x86_64
 
 # Create a separate tmux session so the binary keeps spinning regardless of your SSH connection
 # https://tmuxcheatsheet.com/ 
@@ -151,9 +153,13 @@ The project and all repositories are distributed under the **MIT License**. Feel
 * * *
 
 <div align="center">
-    <h1>SUPPORT PROJECT</h1>
-    <p>Want to make necko1 employed or donate enough for a Triple Whopper? Contact me -> <a href=https://t.me/everyonehio>Telegram</a> or <a href="mailto:meow@necko.moe">Mail me</a> (I rarely check that). I don't accept direct card transfers, just so you know</p>
+  <h1>SUPPORT PROJECT</h1>
+  <p>Want to make necko1 employed or donate enough for a Triple Whopper? Contact me -> <a href=https://t.me/everyonehio>Telegram</a> or <a href="mailto:meow@necko.moe">Mail me</a> (I rarely check that). I don't accept direct card transfers, just so you know</p>
+  <p>
     Broke but still want to help?
     You can just <a href="https://github.com/necko-moe/necko3-backend/stargazers"><b>⭐ Star this repo</b></a> to show your love. It really helps!
+  </p>
+  <a href="https://github.com/necko-moe">
     <img src=".github/static/necko3-2-200.png" alt="necko3 support banner" width="1024"/>
+  </a>
 </div>
