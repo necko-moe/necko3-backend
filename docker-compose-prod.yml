@@ -1,7 +1,6 @@
 services:
   necko3:
-    build: .
-    image: necko3-backend:latest
+    image: ghcr.io/necko-moe/necko3-backend:latest
     container_name: necko3-backend
     restart: always
     env_file: .env

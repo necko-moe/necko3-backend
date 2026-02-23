@@ -1,0 +1,13 @@
+services:
+  necko3:
+    image: ghcr.io/necko-moe/necko3-backend:latest
+    container_name: necko3-backend
+    restart: always
+    env_file: .env
+    ports:
+      - "3000:3000"
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -f http://$$BIND_ADDRESS/health" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
