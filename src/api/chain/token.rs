@@ -1,4 +1,5 @@
 use necko3_core::model::TokenConfig;
+use crate::model::core::TokenConfigSchema;
 use necko3_core::state::AppState;
 use axum::extract::{Path, State};
 use axum::Json;
@@ -13,7 +14,7 @@ use crate::model::{ApiError, ApiResponse, Empty};
     params(
         ("name" = String, Path, description = "Network (chain) name")
     ),
-    request_body = TokenConfig,
+    request_body = TokenConfigSchema,
     responses(
         (status = 201, description = "Token added", body = ApiResponse<Empty>),
         (status = 500, description = "Server Error", body = ApiResponse<Empty>)
@@ -38,7 +39,7 @@ pub async fn add_token(
         ("name" = String, Path, description = "Network (chain) name")
     ),
     responses(
-        (status = 200, description = "Network's token list", body = ApiResponse<Vec<TokenConfig>>),
+        (status = 200, description = "Network's token list", body = ApiResponse<Vec<TokenConfigSchema>>),
         (status = 404, description = "Network (chain) not found", body = ApiResponse<Empty>),
         (status = 500, description = "Server Error", body = ApiResponse<Empty>)
     ),
@@ -63,7 +64,7 @@ pub async fn get_tokens(
         ("symbol" = String, Path, description = "Token symbol (e.g. USDC)")
     ),
     responses(
-        (status = 200, description = "Token configuration", body = ApiResponse<TokenConfig>),
+        (status = 200, description = "Token configuration", body = ApiResponse<TokenConfigSchema>),
         (status = 404, description = "Network (chain) or token not found", body = ApiResponse<Empty>),
         (status = 500, description = "Server Error", body = ApiResponse<Empty>)
     ),

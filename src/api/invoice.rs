@@ -1,5 +1,6 @@
 use crate::model::{ApiError, ApiResponse, CreateInvoiceReq, Empty};
-use alloy::primitives::{utils::parse_units, U256};
+use crate::model::core::InvoiceSchema;
+use necko3_core::deps::{parse_units, U256};
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;
@@ -15,7 +16,7 @@ use std::sync::Arc;
     path = "/invoice",
     request_body = CreateInvoiceReq,
     responses(
-        (status = 201, description = "Invoice created", body = ApiResponse<Invoice>),
+        (status = 201, description = "Invoice created", body = ApiResponse<InvoiceSchema>),
         (status = 400, description = "Bad Request", body = ApiResponse<Empty>),
         (status = 404, description = "Chain/token decimals not found", body = ApiResponse<Empty>),
         (status = 500, description = "Server Error", body = ApiResponse<Empty>)
@@ -76,7 +77,7 @@ pub async fn create_invoice(
     get,
     path = "/invoice",
     responses(
-        (status = 200, description = "List all invoices", body = ApiResponse<Vec<Invoice>>),
+        (status = 200, description = "List all invoices", body = ApiResponse<Vec<InvoiceSchema>>),
         (status = 500, description = "Server error", body = ApiResponse<Empty>)
     ),
     tag = "Invoices"
@@ -96,7 +97,7 @@ pub async fn get_invoices(
         ("id" = String, Path, description = "Invoice UUID")
     ),
     responses(
-        (status = 200, description = "Invoice data", body = ApiResponse<Invoice>),
+        (status = 200, description = "Invoice data", body = ApiResponse<InvoiceSchema>),
         (status = 404, description = "Invoice not found", body = ApiResponse<Empty>),
         (status = 500, description = "Server error", body = ApiResponse<Empty>)
     ),
@@ -120,17 +121,17 @@ pub async fn get_invoice_by_id(
         ("id" = String, Path, description = "Invoice UUID")
     ),
     responses(
-        (status = 200, description = "Invoice deleted", body = ApiResponse<Empty>),
+        (status = 200, description = "Invoice cancelled", body = ApiResponse<Empty>),
         (status = 404, description = "Invoice not found", body = ApiResponse<Empty>),
         (status = 500, description = "Server error", body = ApiResponse<Empty>)
     ),
     tag = "Invoices"
 )]
-pub async fn delete_invoice(
+pub async fn cancel_invoice(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<(StatusCode, Json<ApiResponse<String>>), ApiError> {
-    state.db.remove_invoice(&id).await
+    state.db.cancel_invoice(&id).await
         .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
     Ok((StatusCode::OK, Json(ApiResponse::ok())))
 }

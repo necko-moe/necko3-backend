@@ -2,10 +2,10 @@ pub mod token;
 
 pub use token::*;
 
-use necko3_core::model::ChainConfig;
+use necko3_core::model::{ChainConfig, PartialChainUpdate};
 use necko3_core::db::DatabaseAdapter;
 use crate::model::{ApiError, ApiResponse, Empty};
-use necko3_core::model::PartialChainUpdate as UpdateChainReq;
+use crate::model::core::{ChainConfigSchema, PartialChainUpdateSchema};
 use necko3_core::state::AppState;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
@@ -16,7 +16,7 @@ use necko3_core::chain::BlockchainAdapter;
 #[utoipa::path(
     post,
     path = "/chain",
-    request_body = ChainConfig,
+    request_body = ChainConfigSchema,
     responses(
         (status = 201, description = "Chain added", body = ApiResponse<Empty>),
         (status = 500, description = "Server Error", body = ApiResponse<Empty>)
@@ -40,7 +40,7 @@ pub async fn add_chain(
     get,
     path = "/chain",
     responses(
-        (status = 200, description = "Supported chain list", body = ApiResponse<Vec<ChainConfig>>),
+        (status = 200, description = "Supported chain list", body = ApiResponse<Vec<ChainConfigSchema>>),
         (status = 500, description = "Server Error", body = ApiResponse<Empty>)
     ),
     tag = "Chains"
@@ -63,7 +63,7 @@ pub async fn get_chains(
         ("name" = String, Path, description = "Chain name")
     ),
     responses(
-        (status = 200, description = "Chain configuration", body = ApiResponse<ChainConfig>),
+        (status = 200, description = "Chain configuration", body = ApiResponse<ChainConfigSchema>),
         (status = 404, description = "Chain not found", body = ApiResponse<Empty>),
         (status = 500, description = "Server Error", body = ApiResponse<Empty>)
     ),
@@ -108,7 +108,7 @@ pub async fn delete_chain(
 #[utoipa::path(
     patch,
     path = "/chain/{name}",
-    request_body = UpdateChainReq,
+    request_body = PartialChainUpdateSchema,
     params(
         ("name" = String, Path, description = "Chain name")
     ),
@@ -121,7 +121,7 @@ pub async fn delete_chain(
 pub async fn update_chain(
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
-    Json(payload): Json<UpdateChainReq>,
+    Json(payload): Json<PartialChainUpdate>,
 ) -> Result<(StatusCode, Json<ApiResponse<String>>), ApiError> {
     state.db.update_chain_partial(&name, &payload).await
         .map_err(|e| ApiError::InternalServerError(e.to_string()))?;

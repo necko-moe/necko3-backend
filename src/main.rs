@@ -43,8 +43,6 @@ async fn main() -> anyhow::Result<()> {
 
     info!("Initializing application...");
 
-    info!("Initializing application...");
-
     let db: Database = {
         let database_url = std::env::var("DATABASE_URL")
             .expect("DATABASE_URL must be set");

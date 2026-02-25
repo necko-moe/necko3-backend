@@ -1,17 +1,14 @@
-pub mod invoice;
-pub mod chain;
-pub mod auth;
+mod invoice;
+mod chain;
+mod auth;
 
-use crate::model::ApiResponse;
-use crate::model::CreateInvoiceReq;
-use crate::model::Empty;
-use necko3_core::model::{Invoice, ChainConfig, TokenConfig};
+use crate::model::{ApiResponse, CreateInvoiceReq, Empty};
+use crate::model::core::{InvoiceSchema, ChainConfigSchema, TokenConfigSchema};
 use necko3_core::state::AppState;
 use axum::routing::{delete, get, patch, post};
 use axum::{middleware, Router};
 use std::sync::Arc;
-use alloy::transports::http::reqwest::header::HeaderName;
-use axum::http::{header, HeaderValue, Method};
+use axum::http::{header, HeaderName, HeaderValue, Method};
 use tower_http::cors::{AllowOrigin, CorsLayer};
 use tower_http::trace::TraceLayer;
 use tracing::{error, info};
@@ -39,21 +36,21 @@ use crate::api::auth::{auth_middleware, SecurityAddon};
         create_invoice,
         get_invoices,
         get_invoice_by_id,
-        delete_invoice
+        cancel_invoice
     ),
     components(
         schemas(
-            Invoice,
+            InvoiceSchema,
             CreateInvoiceReq,
-            ChainConfig,
-            TokenConfig,
+            ChainConfigSchema,
+            TokenConfigSchema,
 
-            ApiResponse<Invoice>,
-            ApiResponse<Vec<Invoice>>,
-            ApiResponse<ChainConfig>,
-            ApiResponse<Vec<ChainConfig>>,
-            ApiResponse<TokenConfig>,
-            ApiResponse<Vec<TokenConfig>>,
+            ApiResponse<InvoiceSchema>,
+            ApiResponse<Vec<InvoiceSchema>>,
+            ApiResponse<ChainConfigSchema>,
+            ApiResponse<Vec<ChainConfigSchema>>,
+            ApiResponse<TokenConfigSchema>,
+            ApiResponse<Vec<TokenConfigSchema>>,
             ApiResponse<String>,
             ApiResponse<Empty>
         )
@@ -75,7 +72,7 @@ pub async fn serve(
         .route("/invoice", post(create_invoice))
         .route("/invoice", get(get_invoices))
         .route("/invoice/{id}", get(get_invoice_by_id))
-        .route("/invoice/{id}", delete(delete_invoice))
+        .route("/invoice/{id}", delete(cancel_invoice))
 
         .route("/chain", post(add_chain))
         .route("/chain", get(get_chains))
