@@ -1,9 +1,12 @@
 mod invoice;
 mod chain;
 mod auth;
+mod payment;
+mod webhook;
 
-use crate::model::{ApiResponse, CreateInvoiceReq, Empty};
-use crate::model::core::{InvoiceSchema, ChainConfigSchema, TokenConfigSchema};
+use crate::model::{CreateInvoiceReq, Empty};
+use crate::model::core::{InvoiceSchema, ChainConfigSchema, TokenConfigSchema, WebhookSchema,
+                         PaymentSchema};
 use necko3_core::state::AppState;
 use axum::routing::{delete, get, patch, post};
 use axum::{middleware, Router};
@@ -17,6 +20,8 @@ use utoipa_swagger_ui::SwaggerUi;
 
 pub use chain::*;
 pub use invoice::*;
+pub use payment::*;
+pub use webhook::*;
 use crate::api::auth::{auth_middleware, SecurityAddon};
 
 #[derive(OpenApi)]
@@ -36,7 +41,15 @@ use crate::api::auth::{auth_middleware, SecurityAddon};
         create_invoice,
         get_invoices,
         get_invoice_by_id,
-        cancel_invoice
+        cancel_invoice,
+
+        get_payment,
+        get_payments,
+        cancel_payment,
+
+        get_webhook,
+        get_webhooks,
+        cancel_webhook
     ),
     components(
         schemas(
@@ -44,15 +57,8 @@ use crate::api::auth::{auth_middleware, SecurityAddon};
             CreateInvoiceReq,
             ChainConfigSchema,
             TokenConfigSchema,
-
-            ApiResponse<InvoiceSchema>,
-            ApiResponse<Vec<InvoiceSchema>>,
-            ApiResponse<ChainConfigSchema>,
-            ApiResponse<Vec<ChainConfigSchema>>,
-            ApiResponse<TokenConfigSchema>,
-            ApiResponse<Vec<TokenConfigSchema>>,
-            ApiResponse<String>,
-            ApiResponse<Empty>
+            WebhookSchema,
+            PaymentSchema
         )
     ),
     modifiers(&SecurityAddon),
@@ -84,6 +90,14 @@ pub async fn serve(
         .route("/chain/{name}/token", get(get_tokens))
         .route("/chain/{name}/token/{symbol}", get(get_token))
         .route("/chain/{name}/token/{symbol}", delete(delete_token))
+
+        .route("/payment", get(get_payments))
+        .route("/payment/{id}", get(get_payment))
+        .route("/payment/{id}", delete(cancel_payment))
+
+        .route("/webhook", get(get_webhooks))
+        .route("/webhook/{id}", get(get_webhook))
+        .route("/webhook/{id}", delete(cancel_webhook))
 
         .layer(middleware::from_fn_with_state(state.clone(), auth_middleware))
         .layer(cors_layer)

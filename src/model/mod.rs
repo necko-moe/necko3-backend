@@ -1,10 +1,11 @@
 pub mod core;
 
+use crate::model::core::{PaymentStatusSchema, WebhookStatusSchema};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::Json;
 use serde::{Deserialize, Serialize};
-use utoipa::ToSchema;
+use utoipa::{IntoParams, ToSchema};
 
 #[derive(Debug, Clone, Deserialize, Serialize, ToSchema)]
 pub struct CreateInvoiceReq {
@@ -15,6 +16,24 @@ pub struct CreateInvoiceReq {
     pub webhook_secret: Option<String>,
     /// seconds
     pub expire_after: Option<u64>, 
+}
+
+#[derive(Serialize, Deserialize, ToSchema, IntoParams)]
+#[into_params(parameter_in = Query)]
+pub struct PaymentFilter {
+    pub invoice_id: Option<String>,
+    pub status: Option<PaymentStatusSchema>,
+    pub network: Option<String>,
+    pub address_to: Option<String>
+}
+
+#[derive(Serialize, Deserialize, ToSchema, IntoParams)]
+#[into_params(parameter_in = Query)]
+pub struct WebhookFilter {
+    pub invoice_id: Option<String>,
+    pub status: Option<WebhookStatusSchema>,
+    pub event_type: Option<String>,
+    pub url: Option<String>
 }
 
 #[derive(Serialize, ToSchema)]

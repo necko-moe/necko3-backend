@@ -122,7 +122,6 @@ pub async fn get_invoice_by_id(
     ),
     responses(
         (status = 200, description = "Invoice cancelled", body = ApiResponse<Empty>),
-        (status = 404, description = "Invoice not found", body = ApiResponse<Empty>),
         (status = 500, description = "Server error", body = ApiResponse<Empty>)
     ),
     tag = "Invoices"

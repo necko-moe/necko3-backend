@@ -1,5 +1,5 @@
-use necko3_core::model::{ChainConfig, ChainType, Invoice, InvoiceStatus, PartialChainUpdate, TokenConfig};
-use serde::Serialize;
+use necko3_core::model::{ChainConfig, ChainType, Invoice, InvoiceStatus, PartialChainUpdate, PaymentStatus, TokenConfig, WebhookStatus};
+use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::sync::{Arc, RwLock};
 use chrono::{DateTime, Utc};
@@ -153,11 +153,102 @@ pub enum InvoiceStatusSchema {
 
 impl Into<InvoiceStatus> for InvoiceStatusSchema {
     fn into(self) -> InvoiceStatus {
-        match self { 
+        match self {
             InvoiceStatusSchema::Pending => InvoiceStatus::Pending,
             InvoiceStatusSchema::Paid => InvoiceStatus::Paid,
             InvoiceStatusSchema::Expired => InvoiceStatus::Expired,
             InvoiceStatusSchema::Cancelled => InvoiceStatus::Cancelled,
+        }
+    }
+}
+
+#[derive(ToSchema)]
+pub struct WebhookSchema {
+    pub id: String,
+    pub invoice_id: String,
+    pub url: String,
+    pub payload: WebhookEventSchema,
+    pub status: WebhookStatusSchema,
+    pub attempts: u32,
+    pub max_retries: u32,
+    pub next_retry: DateTime<Utc>,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Serialize, ToSchema)]
+#[serde(tag = "event_type", content = "data", rename_all = "snake_case")]
+pub enum WebhookEventSchema {
+    TxDetected {
+        invoice_id: String,
+        tx_hash: String,
+        amount: String,
+        currency: String,
+    },
+    TxConfirmed {
+        invoice_id: String,
+        tx_hash: String,
+        confirmations: u64,
+    },
+    InvoicePaid {
+        invoice_id: String,
+        paid_amount: String,
+    },
+    InvoiceExpired {
+        invoice_id: String,
+    },
+}
+
+#[derive(Copy, Clone, Serialize, Deserialize, ToSchema)]
+pub enum WebhookStatusSchema {
+    Pending,
+    Processing,
+    Sent,
+    Failed,
+    Cancelled,
+}
+
+impl Into<WebhookStatus> for WebhookStatusSchema {
+    fn into(self) -> WebhookStatus {
+        match self {
+            WebhookStatusSchema::Pending => WebhookStatus::Pending,
+            WebhookStatusSchema::Processing => WebhookStatus::Processing,
+            WebhookStatusSchema::Sent => WebhookStatus::Sent,
+            WebhookStatusSchema::Failed => WebhookStatus::Failed,
+            WebhookStatusSchema::Cancelled => WebhookStatus::Cancelled,
+        }
+    }
+}
+
+#[derive(ToSchema, Serialize)]
+pub struct PaymentSchema {
+    pub id: String,
+    pub invoice_id: String,
+    pub from: String,
+    pub to: String,
+    pub network: String,
+    pub tx_hash: String,
+
+    #[schema(value_type = String, example = "1000000000000")]
+    pub amount_raw: U256,
+    pub block_number: u64,
+    pub log_index: u64,
+    pub status: PaymentStatusSchema,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Copy, Clone, Serialize, Deserialize, ToSchema)]
+pub enum PaymentStatusSchema {
+    Confirming,
+    Confirmed,
+    Cancelled,
+}
+
+impl Into<PaymentStatus> for PaymentStatusSchema {
+    fn into(self) -> PaymentStatus {
+        match self {
+            PaymentStatusSchema::Confirming => PaymentStatus::Confirming,
+            PaymentStatusSchema::Confirmed => PaymentStatus::Confirmed,
+            PaymentStatusSchema::Cancelled => PaymentStatus::Cancelled,
         }
     }
 }
