@@ -22,7 +22,7 @@
 ### Features
 - Always up-to-date Swagger UI, which can be disabled for production _(disabling it has zero impact on memory usage)_.
 - Authorization via `X-API-Key` header.
-- ~~Public endpoints not requiring an API key~~ **TODO**.
+- Public invoice endpoints not requiring an API key.
 - Lightweight, incredibly fast, asynchronous architecture.
 - Configurable log output format (compact/full or json for production).
 - Production-ready `docker-compose.yml` with healthchecks included.
