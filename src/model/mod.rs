@@ -1,4 +1,5 @@
 pub mod core;
+pub mod public;
 
 use crate::model::core::{PaymentStatusSchema, WebhookStatusSchema};
 use axum::http::StatusCode;

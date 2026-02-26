@@ -1,4 +1,4 @@
-use necko3_core::model::{ChainConfig, ChainType, Invoice, InvoiceStatus, PartialChainUpdate, PaymentStatus, TokenConfig, WebhookStatus};
+use necko3_core::model::{ChainConfig, ChainType, Invoice, InvoiceStatus, PartialChainUpdate, Payment, PaymentStatus, TokenConfig, WebhookStatus};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::sync::{Arc, RwLock};
@@ -143,7 +143,7 @@ impl Into<Invoice> for InvoiceSchema {
     }
 }
 
-#[derive(ToSchema)]
+#[derive(ToSchema, Serialize, Deserialize)]
 pub enum InvoiceStatusSchema {
     Pending,
     Paid,
@@ -158,6 +158,17 @@ impl Into<InvoiceStatus> for InvoiceStatusSchema {
             InvoiceStatusSchema::Paid => InvoiceStatus::Paid,
             InvoiceStatusSchema::Expired => InvoiceStatus::Expired,
             InvoiceStatusSchema::Cancelled => InvoiceStatus::Cancelled,
+        }
+    }
+}
+
+impl Into<InvoiceStatusSchema> for InvoiceStatus {
+    fn into(self) -> InvoiceStatusSchema {
+        match self {
+            InvoiceStatus::Pending => InvoiceStatusSchema::Pending,
+            InvoiceStatus::Paid => InvoiceStatusSchema::Paid,
+            InvoiceStatus::Expired => InvoiceStatusSchema::Expired,
+            InvoiceStatus::Cancelled => InvoiceStatusSchema::Cancelled,
         }
     }
 }
@@ -226,6 +237,7 @@ pub struct PaymentSchema {
     pub from: String,
     pub to: String,
     pub network: String,
+    pub token: String,
     pub tx_hash: String,
 
     #[schema(value_type = String, example = "1000000000000")]
@@ -234,6 +246,25 @@ pub struct PaymentSchema {
     pub log_index: u64,
     pub status: PaymentStatusSchema,
     pub created_at: DateTime<Utc>,
+}
+
+impl Into<Payment> for PaymentSchema {
+    fn into(self) -> Payment {
+        Payment {
+            id: self.id,
+            invoice_id: self.invoice_id,
+            from: self.from,
+            to: self.to,
+            network: self.network,
+            token: self.token,
+            tx_hash: self.tx_hash,
+            amount_raw: self.amount_raw,
+            block_number: self.block_number,
+            log_index: self.log_index,
+            status: self.status.into(),
+            created_at: self.created_at,
+        }
+    }
 }
 
 #[derive(Copy, Clone, Serialize, Deserialize, ToSchema)]
@@ -249,6 +280,16 @@ impl Into<PaymentStatus> for PaymentStatusSchema {
             PaymentStatusSchema::Confirming => PaymentStatus::Confirming,
             PaymentStatusSchema::Confirmed => PaymentStatus::Confirmed,
             PaymentStatusSchema::Cancelled => PaymentStatus::Cancelled,
+        }
+    }
+}
+
+impl Into<PaymentStatusSchema> for PaymentStatus {
+    fn into(self) -> PaymentStatusSchema {
+        match self {
+            PaymentStatus::Confirming => PaymentStatusSchema::Confirming,
+            PaymentStatus::Confirmed => PaymentStatusSchema::Confirmed,
+            PaymentStatus::Cancelled => PaymentStatusSchema::Cancelled,
         }
     }
 }

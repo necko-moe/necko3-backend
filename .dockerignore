@@ -1,6 +1,7 @@
 target/
 .git/
 .env
+Dockerfile.dev
 Dockerfile
 docker-compose-prod.yml
 docker-compose-db.yml

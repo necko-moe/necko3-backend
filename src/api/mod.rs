@@ -3,8 +3,9 @@ mod chain;
 mod auth;
 mod payment;
 mod webhook;
+mod public;
 
-use crate::model::{CreateInvoiceReq, Empty};
+use crate::model::{CreateInvoiceReq};
 use crate::model::core::{InvoiceSchema, ChainConfigSchema, TokenConfigSchema, WebhookSchema,
                          PaymentSchema};
 use necko3_core::state::AppState;
@@ -49,7 +50,10 @@ use crate::api::auth::{auth_middleware, SecurityAddon};
 
         get_webhook,
         get_webhooks,
-        cancel_webhook
+        cancel_webhook,
+
+        public::get_invoice_data,
+        public::get_invoice_payments
     ),
     components(
         schemas(
@@ -100,6 +104,10 @@ pub async fn serve(
         .route("/webhook/{id}", delete(cancel_webhook))
 
         .layer(middleware::from_fn_with_state(state.clone(), auth_middleware))
+
+        .route("/public/invoice/{id}", get(public::get_invoice_data))
+        .route("/public/invoice/{id}/payments", get(public::get_invoice_payments))
+
         .layer(cors_layer)
         .layer(TraceLayer::new_for_http())
 
