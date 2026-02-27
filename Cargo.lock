@@ -2994,7 +2994,7 @@ dependencies = [
 
 [[package]]
 name = "necko3"
-version = "0.1.3"
+version = "0.1.4"
 dependencies = [
  "anyhow",
  "axum",
@@ -3013,8 +3013,8 @@ dependencies = [
 
 [[package]]
 name = "necko3-core"
-version = "1.0.7"
-source = "git+https://github.com/necko-moe/necko3-core.git#ad4d5b66af068c36f316c8401c692fe5176551c7"
+version = "1.0.8"
+source = "git+https://github.com/necko-moe/necko3-core.git#7f2459cd96b98381fff0d97314e9d44baa64247f"
 dependencies = [
  "alloy",
  "anyhow",

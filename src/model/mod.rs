@@ -10,12 +10,18 @@ use utoipa::{IntoParams, ToSchema};
 
 #[derive(Debug, Clone, Deserialize, Serialize, ToSchema)]
 pub struct CreateInvoiceReq {
+    #[schema(example = "25.37")]
     pub amount: String,
+    #[schema(example = "USDC")]
     pub token: String,
+    #[schema(example = "Polygon")]
     pub network: String,
+    #[schema(example = "https://merchant.website/payment")]
     pub webhook_url: Option<String>,
+    #[schema(example = "mega-secret-random-generated-string")]
     pub webhook_secret: Option<String>,
     /// seconds
+    #[schema(example = 900)]
     pub expire_after: Option<u64>, 
 }
 
@@ -42,6 +48,7 @@ pub struct Empty {}
 
 #[derive(Serialize, ToSchema)]
 pub struct ApiResponse<T> {
+    #[schema(example = "success | error")]
     pub status: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub data: Option<T>,

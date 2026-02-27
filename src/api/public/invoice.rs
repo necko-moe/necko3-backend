@@ -19,7 +19,10 @@ use std::sync::Arc;
         (status = 404, description = "Invoice not found", body = ApiResponse<Empty>),
         (status = 500, description = "Server error", body = ApiResponse<Empty>)
     ),
-    tag = "Public"
+    tag = "Public",
+    security(
+        ()
+    )
 )]
 pub async fn get_invoice_data(
     State(state): State<Arc<AppState>>,
@@ -44,7 +47,10 @@ pub async fn get_invoice_data(
         (status = 200, description = "List all payments for invoice", body = ApiResponse<Vec<PublicPaymentModel>>),
         (status = 500, description = "Server error", body = ApiResponse<Empty>)
     ),
-    tag = "Public"
+    tag = "Public",
+    security(
+        ()
+    )
 )]
 pub async fn get_invoice_payments(
     State(state): State<Arc<AppState>>,
@@ -54,18 +60,18 @@ pub async fn get_invoice_payments(
         .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
 
     let mut public_payments = vec![];
-    
+
     for p in payments {
         let chain = p.network;
         let token = p.token;
 
         let decimals_opt = state.db.get_token_decimals(&chain, &token).await
             .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
-        
+
         if let Some(decimals) = decimals_opt {
             let amount = format_units(p.amount_raw, decimals)
                 .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
-            
+
             public_payments.push(PublicPaymentModel {
                 id: p.id,
                 invoice_id: p.invoice_id,

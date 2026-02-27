@@ -8,6 +8,7 @@ mod public;
 use crate::model::{CreateInvoiceReq};
 use crate::model::core::{InvoiceSchema, ChainConfigSchema, TokenConfigSchema, WebhookSchema,
                          PaymentSchema};
+use crate::model::public::{PublicInvoiceModel, PublicPaymentModel};
 use necko3_core::state::AppState;
 use axum::routing::{delete, get, patch, post};
 use axum::{middleware, Router};
@@ -62,7 +63,9 @@ use crate::api::auth::{auth_middleware, SecurityAddon};
             ChainConfigSchema,
             TokenConfigSchema,
             WebhookSchema,
-            PaymentSchema
+            PaymentSchema,
+            PublicInvoiceModel,
+            PublicPaymentModel
         )
     ),
     modifiers(&SecurityAddon),

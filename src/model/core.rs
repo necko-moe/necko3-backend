@@ -1,21 +1,32 @@
-use necko3_core::model::{ChainConfig, ChainType, Invoice, InvoiceStatus, PartialChainUpdate, Payment, PaymentStatus, TokenConfig, WebhookStatus};
+use necko3_core::model::{ChainConfig, ChainType, Invoice, InvoiceStatus, PartialChainUpdate,
+                         Payment, PaymentStatus, TokenConfig, WebhookStatus};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::sync::{Arc, RwLock};
 use chrono::{DateTime, Utc};
 use necko3_core::deps::U256;
+use utoipa::r#gen::serde_json::json;
 use utoipa::ToSchema;
 
 #[derive(Serialize, ToSchema)]
 pub struct ChainConfigSchema {
+    #[schema(example = "Polygon")]
     pub name: String,
-    pub rpc_url: String,
+    #[schema(example = json!([ "https://rpc-node" ]))]
+    pub rpc_urls: Vec<String>,
     pub chain_type: ChainTypeSchema,
+    #[schema(example = "xpubabc123...")]
     pub xpub: String,
+    #[schema(example = "POL")]
     pub native_symbol: String,
+    #[schema(example = "18")]
     pub decimals: u8,
+    #[schema(example = "0")]
+    /// 0 == use latest block in blockchain
     pub last_processed_block: u64,
+    #[schema(example = "5")]
     pub block_lag: u8,
+    #[schema(example = "40")]
     pub required_confirmations: u64,
 
     #[schema(ignore)]
@@ -31,7 +42,7 @@ impl Into<ChainConfig> for ChainConfigSchema {
     fn into(self) -> ChainConfig {
         ChainConfig {
             name: self.name,
-            rpc_url: self.rpc_url,
+            rpc_urls: self.rpc_urls,
             chain_type: self.chain_type.into(),
             xpub: self.xpub,
             native_symbol: self.native_symbol,
@@ -60,8 +71,11 @@ impl Into<ChainType> for ChainTypeSchema {
 
 #[derive(ToSchema)]
 pub struct TokenConfigSchema {
+    #[schema(example = "USDC")]
     pub symbol: String,
+    #[schema(example = "0xabc123...")]
     pub contract: String,
+    #[schema(example = "6")]
     pub decimals: u8,
 }
 
@@ -77,17 +91,23 @@ impl Into<TokenConfig> for TokenConfigSchema {
 
 #[derive(ToSchema)]
 pub struct PartialChainUpdateSchema {
-    pub rpc_url: Option<String>,
+    #[schema(example = json!([ "https://rpc-node" ]))]
+    pub rpc_urls: Option<Vec<String>>,
+    #[schema(example = "100500")]
+    /// 0 == use latest block in blockchain
     pub last_processed_block: Option<u64>,
+    #[schema(example = "xpubabc123...")]
     pub xpub: Option<String>,
+    #[schema(example = "5")]
     pub block_lag: Option<u8>,
+    #[schema(example = "40")]
     pub required_confirmations: Option<u64>,
 }
 
 impl Into<PartialChainUpdate> for PartialChainUpdateSchema {
     fn into(self) -> PartialChainUpdate {
         PartialChainUpdate {
-            rpc_url: self.rpc_url,
+            rpc_urls: self.rpc_urls,
             last_processed_block: self.last_processed_block,
             xpub: self.xpub,
             block_lag: self.block_lag,
@@ -98,25 +118,33 @@ impl Into<PartialChainUpdate> for PartialChainUpdateSchema {
 
 #[derive(ToSchema)]
 pub struct InvoiceSchema {
+    #[schema(example = "abcef000-abcd-4bcd-8bcd-abcdef000000")]
     pub id: String,
+    #[schema(example = 0)]
     pub address_index: u32,
+    #[schema(example = "0xabc123...")]
     pub address: String,
+    #[schema(example = "25.37")]
     pub amount: String,
-
-    #[schema(value_type = String, example = "1000000000000")]
+    #[schema(value_type = String, example = "0x1831d90")]
     pub amount_raw: U256,
-
+    #[schema(example = "0.0")]
     pub paid: String,
-
-    #[schema(value_type = String, example = "0")]
+    #[schema(value_type = String, example = "0x0")]
     pub paid_raw: U256,
-
+    #[schema(example = "USDC")]
     pub token: String,
+    #[schema(example = "Polygon")]
     pub network: String,
+    #[schema(example = 6)]
     pub decimals: u8,
+    #[schema(example = "https://merchant.website/payment")]
     pub webhook_url: Option<String>,
+    #[schema(example = "mega-secret-random-generated-string")]
     pub webhook_secret: Option<String>,
+    #[schema(example = "2026-02-27T21:20:02.537Z")]
     pub created_at: DateTime<Utc>,
+    #[schema(example = "2026-02-27T21:35:02.537Z")]
     pub expires_at: DateTime<Utc>,
     pub status: InvoiceStatusSchema,
 }
@@ -175,14 +203,21 @@ impl Into<InvoiceStatusSchema> for InvoiceStatus {
 
 #[derive(ToSchema)]
 pub struct WebhookSchema {
+    #[schema(example = "abcef000-abcd-4bcd-8bcd-abcdef000000")]
     pub id: String,
+    #[schema(example = "abcef000-abcd-4bcd-8bcd-abcdef000000")]
     pub invoice_id: String,
+    #[schema(example = "https://merchant.website/payment")]
     pub url: String,
     pub payload: WebhookEventSchema,
     pub status: WebhookStatusSchema,
+    #[schema(example = 3)]
     pub attempts: u32,
+    #[schema(example = 5)]
     pub max_retries: u32,
+    #[schema(example = "2026-02-27T21:26:02.537Z")]
     pub next_retry: DateTime<Utc>,
+    #[schema(example = "2026-02-27T21:25:02.537Z")]
     pub created_at: DateTime<Utc>,
 }
 
@@ -190,21 +225,31 @@ pub struct WebhookSchema {
 #[serde(tag = "event_type", content = "data", rename_all = "snake_case")]
 pub enum WebhookEventSchema {
     TxDetected {
+        #[schema(example = "abcef000-abcd-4bcd-8bcd-abcdef000000")]
         invoice_id: String,
+        #[schema(example = "0xabcdef123456...")]
         tx_hash: String,
+        #[schema(example = "3.7")]
         amount: String,
+        #[schema(example = "USDC")]
         currency: String,
     },
     TxConfirmed {
+        #[schema(example = "abcef000-abcd-4bcd-8bcd-abcdef000000")]
         invoice_id: String,
+        #[schema(example = "0xabcdef123456...")]
         tx_hash: String,
+        #[schema(example = 40)]
         confirmations: u64,
     },
     InvoicePaid {
+        #[schema(example = "abcef000-abcd-4bcd-8bcd-abcdef000000")]
         invoice_id: String,
+        #[schema(example = "25.37")]
         paid_amount: String,
     },
     InvoiceExpired {
+        #[schema(example = "abcef000-abcd-4bcd-8bcd-abcdef000000")]
         invoice_id: String,
     },
 }
@@ -232,19 +277,29 @@ impl Into<WebhookStatus> for WebhookStatusSchema {
 
 #[derive(ToSchema, Serialize)]
 pub struct PaymentSchema {
+    #[schema(example = "abcef000-abcd-4bcd-8bcd-abcdef000000")]
     pub id: String,
+    #[schema(example = "abcef000-abcd-4bcd-8bcd-abcdef000000")]
     pub invoice_id: String,
+    #[schema(example = "0xabc123...")]
     pub from: String,
+    #[schema(example = "0xabc123...")]
     pub to: String,
+    #[schema(example = "Polygon")]
     pub network: String,
+    #[schema(example = "USDC")]
     pub token: String,
+    #[schema(example = "0xabcdef123456...")]
     pub tx_hash: String,
 
-    #[schema(value_type = String, example = "1000000000000")]
+    #[schema(value_type = String, example = "0x1831d90")]
     pub amount_raw: U256,
+    #[schema(example = "100500")]
     pub block_number: u64,
+    #[schema(example = "37")]
     pub log_index: u64,
     pub status: PaymentStatusSchema,
+    #[schema(example = "2026-02-27T21:20:02.537Z")]
     pub created_at: DateTime<Utc>,
 }
 
