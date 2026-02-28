@@ -1,12 +1,12 @@
 pub mod core;
 pub mod public;
 
-use crate::model::core::{PaymentStatusSchema, WebhookStatusSchema};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::Json;
+use necko3_core::model::PaginatedVec;
 use serde::{Deserialize, Serialize};
-use utoipa::{IntoParams, ToSchema};
+use utoipa::ToSchema;
 
 #[derive(Debug, Clone, Deserialize, Serialize, ToSchema)]
 pub struct CreateInvoiceReq {
@@ -23,24 +23,6 @@ pub struct CreateInvoiceReq {
     /// seconds
     #[schema(example = 900)]
     pub expire_after: Option<u64>, 
-}
-
-#[derive(Serialize, Deserialize, ToSchema, IntoParams)]
-#[into_params(parameter_in = Query)]
-pub struct PaymentFilter {
-    pub invoice_id: Option<String>,
-    pub status: Option<PaymentStatusSchema>,
-    pub network: Option<String>,
-    pub address_to: Option<String>
-}
-
-#[derive(Serialize, Deserialize, ToSchema, IntoParams)]
-#[into_params(parameter_in = Query)]
-pub struct WebhookFilter {
-    pub invoice_id: Option<String>,
-    pub status: Option<WebhookStatusSchema>,
-    pub event_type: Option<String>,
-    pub url: Option<String>
 }
 
 #[derive(Serialize, ToSchema)]
@@ -107,5 +89,33 @@ impl IntoResponse for ApiError {
 
         let body = ApiResponse::<()>::error(msg);
         (status, Json(body)).into_response()
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct PaginatedVecPage<T> {
+    pub items: Vec<T>,
+    #[schema(example = 37)]
+    pub total: u64,
+    #[schema(example = 20)]
+    pub page_size: u32,
+    #[schema(example = 1)]
+    pub page: u64,
+}
+
+impl<T> From<PaginatedVec<T>> for PaginatedVecPage<T> {
+    fn from(value: PaginatedVec<T>) -> Self {
+        let page = if value.limit > 0 {
+            (value.offset / value.limit as u64) + 1
+        } else {
+            1
+        };
+
+        Self {
+            items: value.items,
+            total: value.total,
+            page_size: value.limit,
+            page,
+        }
     }
 }

@@ -1,6 +1,6 @@
 [package]
 name = "necko3"
-version = "0.1.4"
+version = "0.1.5"
 edition = "2024"
 
 [profile.release]
@@ -19,8 +19,9 @@ anyhow = "1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 
-axum = "0.8"
+axum = { version = "0.8", features = ["macros"] }
 tower-http = { version = "0.6", features = ["cors", "trace", "compression-full"] }
+serde-aux = "4.7"
 
 serde = { version = "1", features = ["derive"] }
 chrono = { version = "0.4", features = ["serde"] }

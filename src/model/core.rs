@@ -1,12 +1,16 @@
-use necko3_core::model::{ChainConfig, ChainType, Invoice, InvoiceStatus, PartialChainUpdate,
-                         Payment, PaymentStatus, TokenConfig, WebhookStatus};
+use serde_aux::prelude::deserialize_option_number_from_string;
+use serde_aux::prelude::deserialize_number_from_string;
+use necko3_core::model::{
+    ChainConfig, ChainType, Invoice, InvoiceFilter, InvoiceStatus, Pagination, PartialChainUpdate,
+    Payment, PaymentFilter, PaymentStatus, TokenConfig, WebhookFilter, WebhookStatus
+};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::sync::{Arc, RwLock};
 use chrono::{DateTime, Utc};
 use necko3_core::deps::U256;
 use utoipa::r#gen::serde_json::json;
-use utoipa::ToSchema;
+use utoipa::{IntoParams, ToSchema};
 
 #[derive(Serialize, ToSchema)]
 pub struct ChainConfigSchema {
@@ -38,20 +42,20 @@ pub struct ChainConfigSchema {
     pub tokens: Arc<RwLock<HashSet<TokenConfig>>>,
 }
 
-impl Into<ChainConfig> for ChainConfigSchema {
-    fn into(self) -> ChainConfig {
+impl From<ChainConfigSchema> for ChainConfig {
+    fn from(value: ChainConfigSchema) -> Self {
         ChainConfig {
-            name: self.name,
-            rpc_urls: self.rpc_urls,
-            chain_type: self.chain_type.into(),
-            xpub: self.xpub,
-            native_symbol: self.native_symbol,
-            decimals: self.decimals,
-            last_processed_block: self.last_processed_block,
-            block_lag: self.block_lag,
-            required_confirmations: self.required_confirmations,
-            watch_addresses: self.watch_addresses,
-            tokens: self.tokens,
+            name: value.name,
+            rpc_urls: value.rpc_urls,
+            chain_type: value.chain_type.into(),
+            xpub: value.xpub,
+            native_symbol: value.native_symbol,
+            decimals: value.decimals,
+            last_processed_block: value.last_processed_block,
+            block_lag: value.block_lag,
+            required_confirmations: value.required_confirmations,
+            watch_addresses: value.watch_addresses,
+            tokens: value.tokens,
         }
     }
 }
@@ -61,9 +65,9 @@ pub enum ChainTypeSchema {
     EVM
 }
 
-impl Into<ChainType> for ChainTypeSchema {
-    fn into(self) -> ChainType {
-        match self {
+impl From<ChainTypeSchema> for ChainType {
+    fn from(value: ChainTypeSchema) -> Self {
+        match value {
             ChainTypeSchema::EVM => ChainType::EVM,
         }
     }
@@ -79,12 +83,12 @@ pub struct TokenConfigSchema {
     pub decimals: u8,
 }
 
-impl Into<TokenConfig> for TokenConfigSchema {
-    fn into(self) -> TokenConfig {
+impl From<TokenConfigSchema> for TokenConfig {
+    fn from(value: TokenConfigSchema) -> Self {
         TokenConfig {
-            symbol: self.symbol,
-            contract: self.contract,
-            decimals: self.decimals,
+            symbol: value.symbol,
+            contract: value.contract,
+            decimals: value.decimals,
         }
     }
 }
@@ -104,14 +108,14 @@ pub struct PartialChainUpdateSchema {
     pub required_confirmations: Option<u64>,
 }
 
-impl Into<PartialChainUpdate> for PartialChainUpdateSchema {
-    fn into(self) -> PartialChainUpdate {
+impl From<PartialChainUpdateSchema> for PartialChainUpdate {
+    fn from(value: PartialChainUpdateSchema) -> Self {
         PartialChainUpdate {
-            rpc_urls: self.rpc_urls,
-            last_processed_block: self.last_processed_block,
-            xpub: self.xpub,
-            block_lag: self.block_lag,
-            required_confirmations: self.required_confirmations,
+            rpc_urls: value.rpc_urls,
+            last_processed_block: value.last_processed_block,
+            xpub: value.xpub,
+            block_lag: value.block_lag,
+            required_confirmations: value.required_confirmations,
         }
     }
 }
@@ -149,24 +153,24 @@ pub struct InvoiceSchema {
     pub status: InvoiceStatusSchema,
 }
 
-impl Into<Invoice> for InvoiceSchema {
-    fn into(self) -> Invoice {
+impl From<InvoiceSchema> for Invoice {
+    fn from(value: InvoiceSchema) -> Self {
         Invoice {
-            id: self.id,
-            address_index: self.address_index,
-            address: self.address,
-            amount: self.amount,
-            amount_raw: self.amount_raw,
-            paid: self.paid,
-            paid_raw: self.paid_raw,
-            token: self.token,
-            network: self.network,
-            decimals: self.decimals,
-            webhook_url: self.webhook_url,
-            webhook_secret: self.webhook_secret,
-            created_at: self.created_at,
-            expires_at: self.expires_at,
-            status: self.status.into(),
+            id: value.id,
+            address_index: value.address_index,
+            address: value.address,
+            amount: value.amount,
+            amount_raw: value.amount_raw,
+            paid: value.paid,
+            paid_raw: value.paid_raw,
+            token: value.token,
+            network: value.network,
+            decimals: value.decimals,
+            webhook_url: value.webhook_url,
+            webhook_secret: value.webhook_secret,
+            created_at: value.created_at,
+            expires_at: value.expires_at,
+            status: value.status.into(),
         }
     }
 }
@@ -179,9 +183,9 @@ pub enum InvoiceStatusSchema {
     Cancelled,
 }
 
-impl Into<InvoiceStatus> for InvoiceStatusSchema {
-    fn into(self) -> InvoiceStatus {
-        match self {
+impl From<InvoiceStatusSchema> for InvoiceStatus {
+    fn from(value: InvoiceStatusSchema) -> Self {
+        match value {
             InvoiceStatusSchema::Pending => InvoiceStatus::Pending,
             InvoiceStatusSchema::Paid => InvoiceStatus::Paid,
             InvoiceStatusSchema::Expired => InvoiceStatus::Expired,
@@ -190,9 +194,9 @@ impl Into<InvoiceStatus> for InvoiceStatusSchema {
     }
 }
 
-impl Into<InvoiceStatusSchema> for InvoiceStatus {
-    fn into(self) -> InvoiceStatusSchema {
-        match self {
+impl From<InvoiceStatus> for InvoiceStatusSchema {
+    fn from(value: InvoiceStatus) -> Self {
+        match value {
             InvoiceStatus::Pending => InvoiceStatusSchema::Pending,
             InvoiceStatus::Paid => InvoiceStatusSchema::Paid,
             InvoiceStatus::Expired => InvoiceStatusSchema::Expired,
@@ -263,9 +267,9 @@ pub enum WebhookStatusSchema {
     Cancelled,
 }
 
-impl Into<WebhookStatus> for WebhookStatusSchema {
-    fn into(self) -> WebhookStatus {
-        match self {
+impl From<WebhookStatusSchema> for WebhookStatus {
+    fn from(value: WebhookStatusSchema) -> Self {
+        match value {
             WebhookStatusSchema::Pending => WebhookStatus::Pending,
             WebhookStatusSchema::Processing => WebhookStatus::Processing,
             WebhookStatusSchema::Sent => WebhookStatus::Sent,
@@ -303,21 +307,21 @@ pub struct PaymentSchema {
     pub created_at: DateTime<Utc>,
 }
 
-impl Into<Payment> for PaymentSchema {
-    fn into(self) -> Payment {
+impl From<PaymentSchema> for Payment {
+    fn from(value: PaymentSchema) -> Self {
         Payment {
-            id: self.id,
-            invoice_id: self.invoice_id,
-            from: self.from,
-            to: self.to,
-            network: self.network,
-            token: self.token,
-            tx_hash: self.tx_hash,
-            amount_raw: self.amount_raw,
-            block_number: self.block_number,
-            log_index: self.log_index,
-            status: self.status.into(),
-            created_at: self.created_at,
+            id: value.id,
+            invoice_id: value.invoice_id,
+            from: value.from,
+            to: value.to,
+            network: value.network,
+            token: value.token,
+            tx_hash: value.tx_hash,
+            amount_raw: value.amount_raw,
+            block_number: value.block_number,
+            log_index: value.log_index,
+            status: value.status.into(),
+            created_at: value.created_at,
         }
     }
 }
@@ -329,9 +333,9 @@ pub enum PaymentStatusSchema {
     Cancelled,
 }
 
-impl Into<PaymentStatus> for PaymentStatusSchema {
-    fn into(self) -> PaymentStatus {
-        match self {
+impl From<PaymentStatusSchema> for PaymentStatus {
+    fn from(value: PaymentStatusSchema) -> Self {
+        match value {
             PaymentStatusSchema::Confirming => PaymentStatus::Confirming,
             PaymentStatusSchema::Confirmed => PaymentStatus::Confirmed,
             PaymentStatusSchema::Cancelled => PaymentStatus::Cancelled,
@@ -339,12 +343,129 @@ impl Into<PaymentStatus> for PaymentStatusSchema {
     }
 }
 
-impl Into<PaymentStatusSchema> for PaymentStatus {
-    fn into(self) -> PaymentStatusSchema {
-        match self {
+impl From<PaymentStatus> for PaymentStatusSchema {
+    fn from(value: PaymentStatus) -> Self {
+        match value {
             PaymentStatus::Confirming => PaymentStatusSchema::Confirming,
             PaymentStatus::Confirmed => PaymentStatusSchema::Confirmed,
             PaymentStatus::Cancelled => PaymentStatusSchema::Cancelled,
+        }
+    }
+}
+
+#[derive(Copy, Clone, Serialize, Deserialize, ToSchema, IntoParams)]
+#[into_params(parameter_in = Query)]
+pub struct PaginationParams {
+    #[serde(default = "default_page_size")]
+    #[serde(deserialize_with = "deserialize_number_from_string")]
+    #[schema(default = 20, example = 20)]
+    #[param(default = 20)]
+    pub page_size: u32,
+
+    #[serde(default = "default_page")]
+    #[serde(deserialize_with = "deserialize_number_from_string")]
+    #[schema(default = 1, example = 1)]
+    #[param(default = 1)]
+    pub page: u64,
+}
+
+fn default_page_size() -> u32 { 20 }
+fn default_page() -> u64 { 1 }
+
+impl From<PaginationParams> for Pagination {
+    fn from(value: PaginationParams) -> Self {
+        let page = if value.page == 0 { 1 } else { value.page };
+
+        let limit = value.page_size.min(100);
+
+        Pagination {
+            limit,
+            offset: (page - 1) * limit as u64,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, ToSchema, IntoParams)]
+#[into_params(parameter_in = Query)]
+pub struct InvoiceFilterSchema {
+    pub address: Option<String>,
+    pub network: Option<String>,
+    pub token: Option<String>,
+    pub status: Option<InvoiceStatusSchema>,
+
+    #[schema(ignore)]
+    #[param(ignore)]
+    #[serde(flatten)]
+    pub pagination: PaginationParams,
+}
+
+impl From<InvoiceFilterSchema> for InvoiceFilter {
+    fn from(value: InvoiceFilterSchema) -> Self {
+        InvoiceFilter {
+            status: value.status.map(|status| status.into()),
+            address: value.address,
+            network: value.network,
+            token: value.token,
+            pagination: value.pagination.into(),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, ToSchema, IntoParams)]
+#[into_params(parameter_in = Query)]
+pub struct PaymentFilterSchema {
+    pub invoice_id: Option<String>,
+    pub from: Option<String>,
+    pub to: Option<String>,
+    pub network: Option<String>,
+    pub token: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_option_number_from_string")]
+    pub block_number: Option<u64>,
+    pub status: Option<PaymentStatusSchema>,
+
+    #[schema(ignore)]
+    #[param(ignore)]
+    #[serde(flatten)]
+    pub pagination: PaginationParams,
+}
+
+impl From<PaymentFilterSchema> for PaymentFilter {
+    fn from(value: PaymentFilterSchema) -> Self {
+        PaymentFilter {
+            invoice_id: value.invoice_id,
+            from: value.from,
+            to: value.to,
+            network: value.network,
+            token: value.token,
+            block_number: value.block_number,
+            status: value.status.map(|status| status.into()),
+            pagination: value.pagination.into(),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, ToSchema, IntoParams)]
+#[into_params(parameter_in = Query)]
+pub struct WebhookFilterSchema {
+    pub invoice_id: Option<String>,
+    pub event_type: Option<String>,
+    pub url: Option<String>,
+    pub status: Option<WebhookStatusSchema>,
+
+    #[schema(ignore)]
+    #[param(ignore)]
+    #[serde(flatten)]
+    pub pagination: PaginationParams,
+}
+
+impl From<WebhookFilterSchema> for WebhookFilter {
+    fn from(value: WebhookFilterSchema) -> Self {
+        WebhookFilter {
+            invoice_id: value.invoice_id,
+            event_type: value.event_type,
+            url: value.url,
+            status: value.status.map(|status| status.into()),
+            pagination: value.pagination.into(),
         }
     }
 }

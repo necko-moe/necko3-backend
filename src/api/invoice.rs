@@ -1,12 +1,12 @@
-use crate::model::{ApiError, ApiResponse, CreateInvoiceReq, Empty};
-use crate::model::core::InvoiceSchema;
-use necko3_core::deps::{parse_units, U256};
-use axum::extract::{Path, State};
+use crate::model::core::{InvoiceFilterSchema, InvoiceSchema, PaginationParams};
+use crate::model::{ApiError, ApiResponse, CreateInvoiceReq, Empty, PaginatedVecPage};
+use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::Json;
 use chrono::TimeDelta;
 use necko3_core::chain::BlockchainAdapter;
 use necko3_core::db::DatabaseAdapter;
+use necko3_core::deps::{parse_units, U256};
 use necko3_core::model::{Invoice, InvoiceStatus};
 use necko3_core::state::AppState;
 use std::sync::Arc;
@@ -76,18 +76,24 @@ pub async fn create_invoice(
 #[utoipa::path(
     get,
     path = "/invoice",
+    params(
+        InvoiceFilterSchema,
+        PaginationParams
+    ),
     responses(
-        (status = 200, description = "List all invoices", body = ApiResponse<Vec<InvoiceSchema>>),
+        (status = 200, description = "List all invoices", body = ApiResponse<PaginatedVecPage<InvoiceSchema>>),
         (status = 500, description = "Server error", body = ApiResponse<Empty>)
     ),
     tag = "Invoices"
 )]
 pub async fn get_invoices(
-    State(state): State<Arc<AppState>>
-) -> Result<(StatusCode, Json<ApiResponse<Vec<Invoice>>>), ApiError> {
-    let invoices = state.db.get_invoices().await
+    State(state): State<Arc<AppState>>,
+    Query(filter): Query<InvoiceFilterSchema>,
+) -> Result<(StatusCode, Json<ApiResponse<PaginatedVecPage<Invoice>>>), ApiError> {
+    let invoices = state.db.get_invoices(filter.into()).await
         .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
-    Ok((StatusCode::OK, Json(ApiResponse::success(invoices))))
+
+    Ok((StatusCode::OK, Json(ApiResponse::success(invoices.into()))))
 }
 
 #[utoipa::path(

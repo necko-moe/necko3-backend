@@ -1,5 +1,5 @@
-use crate::model::{ApiError, ApiResponse, Empty, PaymentFilter};
-use crate::model::core::PaymentSchema;
+use crate::model::core::{PaginationParams, PaymentFilterSchema, PaymentSchema};
+use crate::model::{ApiError, ApiResponse, Empty, PaginatedVecPage};
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::Json;
@@ -34,35 +34,23 @@ pub async fn cancel_payment(
     get,
     path = "/payment",
     params(
-        PaymentFilter
+        PaymentFilterSchema,
+        PaginationParams
     ),
     responses(
-        (status = 200, description = "List all payments", body = ApiResponse<Vec<PaymentSchema>>),
+        (status = 200, description = "List all payments", body = ApiResponse<PaginatedVecPage<PaymentSchema>>),
         (status = 500, description = "Server error", body = ApiResponse<Empty>)
     ),
     tag = "Payments"
 )]
 pub async fn get_payments(
     State(state): State<Arc<AppState>>,
-    filter: Query<PaymentFilter>,
-) -> Result<(StatusCode, Json<ApiResponse<Vec<Payment>>>), ApiError> {
-    // todo multiple query filters at once
-    let db_result = if let Some(ref inv) = filter.invoice_id {
-        state.db.get_payments_by_invoice(inv).await
-    } else if let Some(status) = filter.status {
-        state.db.get_payments_by_status(status.into()).await
-    } else if let Some(ref net) = filter.network {
-        state.db.get_payments_by_network(net).await
-    } else if let Some(ref addr) = filter.address_to {
-        state.db.get_payments_by_address(addr).await
-    } else {
-        state.db.get_payments().await
-    };
-
-    let payments = db_result
+    Query(filter): Query<PaymentFilterSchema>,
+) -> Result<(StatusCode, Json<ApiResponse<PaginatedVecPage<Payment>>>), ApiError> {
+    let payments = state.db.get_payments(filter.into()).await
         .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
 
-    Ok((StatusCode::OK, Json(ApiResponse::success(payments))))
+    Ok((StatusCode::OK, Json(ApiResponse::success(payments.into()))))
 }
 
 #[utoipa::path(

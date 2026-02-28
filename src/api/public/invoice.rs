@@ -1,12 +1,14 @@
 use crate::model::public::{PublicInvoiceModel, PublicPaymentModel};
-use crate::model::{ApiError, ApiResponse, Empty};
-use axum::extract::{Path, State};
+use crate::model::{ApiError, ApiResponse, Empty, PaginatedVecPage};
+use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::Json;
 use necko3_core::db::DatabaseAdapter;
 use necko3_core::deps::format_units;
 use necko3_core::AppState;
 use std::sync::Arc;
+use necko3_core::model::PaymentFilter;
+use crate::model::core::PaginationParams;
 
 #[utoipa::path(
     get,
@@ -41,10 +43,11 @@ pub async fn get_invoice_data(
     get,
     path = "/public/invoice/{id}/payments",
     params(
-        ("id" = String, Path, description = "Invoice UUID")
+        ("id" = String, Path, description = "Invoice UUID"),
+        PaginationParams
     ),
     responses(
-        (status = 200, description = "List all payments for invoice", body = ApiResponse<Vec<PublicPaymentModel>>),
+        (status = 200, description = "List all payments for invoice", body = ApiResponse<PaginatedVecPage<PublicPaymentModel>>),
         (status = 500, description = "Server error", body = ApiResponse<Empty>)
     ),
     tag = "Public",
@@ -55,13 +58,20 @@ pub async fn get_invoice_data(
 pub async fn get_invoice_payments(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
-) -> Result<(StatusCode, Json<ApiResponse<Vec<PublicPaymentModel>>>), ApiError> {
-    let payments = state.db.get_payments_by_invoice(&id).await
+    Query(pagination): Query<PaginationParams>,
+) -> Result<(StatusCode, Json<ApiResponse<PaginatedVecPage<PublicPaymentModel>>>), ApiError> {
+    let filter = PaymentFilter {
+        invoice_id: Some(id),
+        pagination: pagination.into(),
+        ..Default::default()
+    };
+
+    let payments = state.db.get_payments(filter).await
         .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
 
     let mut public_payments = vec![];
 
-    for p in payments {
+    for p in payments.items {
         let chain = p.network;
         let token = p.token;
 
@@ -87,5 +97,12 @@ pub async fn get_invoice_payments(
         }
     }
 
-    Ok((StatusCode::OK, Json(ApiResponse::success(public_payments))))
+    let payments_page: PaginatedVecPage<PublicPaymentModel> = PaginatedVecPage {
+        items: public_payments,
+        total: payments.total,
+        page_size: pagination.page_size,
+        page: pagination.page,
+    };
+
+    Ok((StatusCode::OK, Json(ApiResponse::success(payments_page))))
 }
