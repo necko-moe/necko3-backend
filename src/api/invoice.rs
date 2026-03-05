@@ -58,6 +58,7 @@ pub async fn create_invoice(
         decimals: token_decimals,
         webhook_url: payload.webhook_url,
         webhook_secret: payload.webhook_secret,
+        webhook_max_retries: payload.webhook_max_retries,
         created_at: chrono::Utc::now(),
         expires_at: chrono::Utc::now()
             + TimeDelta::seconds(payload.expire_after.unwrap_or(900) as i64),

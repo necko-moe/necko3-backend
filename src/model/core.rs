@@ -16,6 +16,8 @@ use utoipa::{IntoParams, ToSchema};
 pub struct ChainConfigSchema {
     #[schema(example = "Polygon")]
     pub name: String,
+    #[schema(example = true)]
+    pub active: bool,
     #[schema(example = json!([ "https://rpc-node" ]))]
     pub rpc_urls: Vec<String>,
     pub chain_type: ChainTypeSchema,
@@ -46,6 +48,7 @@ impl From<ChainConfigSchema> for ChainConfig {
     fn from(value: ChainConfigSchema) -> Self {
         ChainConfig {
             name: value.name,
+            active: value.active,
             rpc_urls: value.rpc_urls,
             chain_type: value.chain_type.into(),
             xpub: value.xpub,
@@ -95,6 +98,8 @@ impl From<TokenConfigSchema> for TokenConfig {
 
 #[derive(ToSchema)]
 pub struct PartialChainUpdateSchema {
+    #[schema(example = false)]
+    pub active: Option<bool>,
     #[schema(example = json!([ "https://rpc-node" ]))]
     pub rpc_urls: Option<Vec<String>>,
     #[schema(example = "100500")]
@@ -111,6 +116,7 @@ pub struct PartialChainUpdateSchema {
 impl From<PartialChainUpdateSchema> for PartialChainUpdate {
     fn from(value: PartialChainUpdateSchema) -> Self {
         PartialChainUpdate {
+            active: value.active,
             rpc_urls: value.rpc_urls,
             last_processed_block: value.last_processed_block,
             xpub: value.xpub,
@@ -146,6 +152,8 @@ pub struct InvoiceSchema {
     pub webhook_url: Option<String>,
     #[schema(example = "mega-secret-random-generated-string")]
     pub webhook_secret: Option<String>,
+    #[schema(example = 5)]
+    pub webhook_max_retries: Option<u32>,
     #[schema(example = "2026-02-27T21:20:02.537Z")]
     pub created_at: DateTime<Utc>,
     #[schema(example = "2026-02-27T21:35:02.537Z")]
@@ -168,6 +176,7 @@ impl From<InvoiceSchema> for Invoice {
             decimals: value.decimals,
             webhook_url: value.webhook_url,
             webhook_secret: value.webhook_secret,
+            webhook_max_retries: value.webhook_max_retries,
             created_at: value.created_at,
             expires_at: value.expires_at,
             status: value.status.into(),

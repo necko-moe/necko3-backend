@@ -20,6 +20,8 @@ pub struct CreateInvoiceReq {
     pub webhook_url: Option<String>,
     #[schema(example = "mega-secret-random-generated-string")]
     pub webhook_secret: Option<String>,
+    #[schema(example = 5)]
+    pub webhook_max_retries: Option<u32>,
     /// seconds
     #[schema(example = 900)]
     pub expire_after: Option<u64>, 
