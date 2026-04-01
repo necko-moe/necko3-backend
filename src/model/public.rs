@@ -23,10 +23,12 @@ pub struct PublicInvoiceModel {
     #[schema(example = "2026-02-27T21:35:02.537Z")]
     pub expires_at: DateTime<Utc>,
     pub status: InvoiceStatusSchema,
+    #[schema(example = 40)]
+    pub required_confirmations: u64,
 }
 
-impl From<Invoice> for PublicInvoiceModel {
-    fn from(value: Invoice) -> Self {
+impl PublicInvoiceModel {
+    pub fn from(value: Invoice, required_confirmations: u64) -> Self {
         Self {
             id: value.id,
             address: value.address,
@@ -37,6 +39,7 @@ impl From<Invoice> for PublicInvoiceModel {
             created_at: value.created_at,
             expires_at: value.expires_at,
             status: value.status.into(),
+            required_confirmations
         }
     }
 }
