@@ -34,13 +34,7 @@ pub async fn get_invoice_data(
         .map_err(|e| ApiError::InternalServerError(e.to_string()))?
         .ok_or_else(|| ApiError::NotFound("Invoice not found".into()))?;
 
-    let required_confirmations = state.db.get_required_confirmations(&invoice.network).await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?
-        .ok_or_else(|| ApiError::NotFound("Chain not found".into()))?;
-
-    let public_invoice: PublicInvoiceModel = PublicInvoiceModel::from(invoice, required_confirmations);
-
-    Ok((StatusCode::OK, Json(ApiResponse::success(public_invoice))))
+    Ok((StatusCode::OK, Json(ApiResponse::success(invoice.into()))))
 }
 
 #[utoipa::path(

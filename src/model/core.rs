@@ -34,6 +34,8 @@ pub struct ChainConfigSchema {
     pub block_lag: u8,
     #[schema(example = "40")]
     pub required_confirmations: u64,
+    #[schema(example = "https://fileserver.tld/assets/polygon_icon.png")]
+    pub logo_url: Option<String>,
 
     #[schema(ignore)]
     #[serde(skip)]
@@ -59,6 +61,7 @@ impl From<ChainConfigSchema> for ChainConfig {
             required_confirmations: value.required_confirmations,
             watch_addresses: value.watch_addresses,
             tokens: value.tokens,
+            logo_url: value.logo_url,
         }
     }
 }
@@ -84,6 +87,8 @@ pub struct TokenConfigSchema {
     pub contract: String,
     #[schema(example = "6")]
     pub decimals: u8,
+    #[schema(example = "https://fileserver.tld/assets/usdc_icon.png")]
+    pub logo_url: Option<String>,
 }
 
 impl From<TokenConfigSchema> for TokenConfig {
@@ -92,6 +97,7 @@ impl From<TokenConfigSchema> for TokenConfig {
             symbol: value.symbol,
             contract: value.contract,
             decimals: value.decimals,
+            logo_url: value.logo_url,
         }
     }
 }
@@ -111,6 +117,8 @@ pub struct PartialChainUpdateSchema {
     pub block_lag: Option<u8>,
     #[schema(example = "40")]
     pub required_confirmations: Option<u64>,
+    #[schema(example = "https://fileserver.tld/assets/polygon_v2_icon.png")]
+    pub logo_url: Option<String>,
 }
 
 impl From<PartialChainUpdateSchema> for PartialChainUpdate {
@@ -122,6 +130,7 @@ impl From<PartialChainUpdateSchema> for PartialChainUpdate {
             xpub: value.xpub,
             block_lag: value.block_lag,
             required_confirmations: value.required_confirmations,
+            logo_url: value.logo_url,
         }
     }
 }

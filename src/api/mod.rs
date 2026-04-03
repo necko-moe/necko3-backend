@@ -8,7 +8,8 @@ mod public;
 use crate::model::{CreateInvoiceReq};
 use crate::model::core::{InvoiceSchema, ChainConfigSchema, TokenConfigSchema, WebhookSchema,
                          PaymentSchema};
-use crate::model::public::{PublicInvoiceModel, PublicPaymentModel};
+use crate::model::public::{PublicInvoiceModel, PublicPaymentModel, PublicChainModel, 
+                           PublicTokenModel};
 use necko3_core::state::AppState;
 use axum::routing::{delete, get, patch, post};
 use axum::{middleware, Router};
@@ -54,7 +55,9 @@ use crate::api::auth::{auth_middleware, SecurityAddon};
         cancel_webhook,
 
         public::get_invoice_data,
-        public::get_invoice_payments
+        public::get_invoice_payments,
+        public::get_public_chain,
+        public::get_public_token
     ),
     components(
         schemas(
@@ -65,7 +68,9 @@ use crate::api::auth::{auth_middleware, SecurityAddon};
             WebhookSchema,
             PaymentSchema,
             PublicInvoiceModel,
-            PublicPaymentModel
+            PublicPaymentModel,
+            PublicChainModel,
+            PublicTokenModel
         )
     ),
     modifiers(&SecurityAddon),
@@ -110,6 +115,8 @@ pub async fn serve(
 
         .route("/public/invoice/{id}", get(public::get_invoice_data))
         .route("/public/invoice/{id}/payments", get(public::get_invoice_payments))
+        .route("/public/chain/{name}", get(public::get_public_chain))
+        .route("/public/chain/{name}/token/{symbol}", get(public::get_public_token))
 
         .layer(cors_layer)
         .layer(TraceLayer::new_for_http())

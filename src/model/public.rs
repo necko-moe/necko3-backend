@@ -1,6 +1,6 @@
 use crate::model::core::{InvoiceStatusSchema, PaymentStatusSchema};
 use chrono::{DateTime, Utc};
-use necko3_core::model::Invoice;
+use necko3_core::model::{ChainConfig, Invoice, TokenConfig};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -23,12 +23,10 @@ pub struct PublicInvoiceModel {
     #[schema(example = "2026-02-27T21:35:02.537Z")]
     pub expires_at: DateTime<Utc>,
     pub status: InvoiceStatusSchema,
-    #[schema(example = 40)]
-    pub required_confirmations: u64,
 }
 
-impl PublicInvoiceModel {
-    pub fn from(value: Invoice, required_confirmations: u64) -> Self {
+impl From<Invoice> for PublicInvoiceModel {
+    fn from(value: Invoice) -> Self {
         Self {
             id: value.id,
             address: value.address,
@@ -39,7 +37,6 @@ impl PublicInvoiceModel {
             created_at: value.created_at,
             expires_at: value.expires_at,
             status: value.status.into(),
-            required_confirmations
         }
     }
 }
@@ -65,4 +62,47 @@ pub struct PublicPaymentModel {
     pub status: PaymentStatusSchema,
     #[schema(example = "2026-02-27T21:20:02.537Z")]
     pub created_at: DateTime<Utc>,
+}
+
+#[derive(ToSchema, Serialize, Deserialize)]
+pub struct PublicChainModel {
+    #[schema(example = 5)]
+    pub block_lag: u8,
+    #[schema(example = 40)]
+    pub required_confirmations: u64,
+    #[schema(example = 18)]
+    pub decimals: u8,
+    #[schema(example = "https://fileserver.tld/assets/polygon_icon.png")]
+    pub logo_url: Option<String>,
+}
+
+impl From<ChainConfig> for PublicChainModel {
+    fn from(value: ChainConfig) -> Self {
+        Self {
+            block_lag: value.block_lag,
+            required_confirmations: value.required_confirmations,
+            decimals: value.decimals,
+            logo_url: value.logo_url,
+        }
+    }
+}
+
+#[derive(ToSchema, Serialize, Deserialize)]
+pub struct PublicTokenModel {
+    #[schema(example = "0xabc123...")]
+    pub contract_address: String,
+    #[schema(example = 6)]
+    pub decimals: u8,
+    #[schema(example = "https://fileserver.tld/assets/usdc_icon.png")]
+    pub logo_url: Option<String>,
+}
+
+impl From<TokenConfig> for PublicTokenModel {
+    fn from(value: TokenConfig) -> Self {
+        Self {
+            contract_address: value.contract,
+            decimals: value.decimals,
+            logo_url: value.logo_url,
+        }
+    }
 }
